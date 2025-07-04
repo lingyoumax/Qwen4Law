@@ -58,7 +58,8 @@ for line in lines:
         if not savedFlag:
             saveData()
             saveText += current_text + "\n"
-        saveText += line + "\n"
+        if line[-1]!='-':
+            saveText += line + "\n"
         savedFlag = True
         current_bian = line
         current_fenbian = "无"
@@ -69,7 +70,8 @@ for line in lines:
         if not savedFlag:
             saveData()
             saveText += current_text + "\n"
-        saveText += line + "\n"
+        if line[-1]!='-':
+            saveText += line + "\n"
         savedFlag = True
         current_fenbian = line
         current_zhang = "无"
@@ -79,7 +81,8 @@ for line in lines:
         if not savedFlag:
             saveData()
             saveText += current_text + "\n"
-        saveText += line + "\n"
+        if line[-1]!='-':
+            saveText += line + "\n"
         savedFlag = True
         current_zhang = line
         current_jie = "无"
@@ -88,7 +91,8 @@ for line in lines:
         if not savedFlag:
             saveData()
             saveText += current_text + "\n"
-        saveText += line + "\n"
+        if line[-1]!='-':
+            saveText += line + "\n"
         savedFlag = True
         current_jie = line
         current_text = "无"
