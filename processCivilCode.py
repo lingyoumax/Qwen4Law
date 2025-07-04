@@ -22,13 +22,14 @@ jie_re = re.compile(r"^第[零一二三四五六七八九十百千]+节\s+")
 tiao_re = re.compile(r"^第[零一二三四五六七八九十百千]+条\s+")
 
 chunks = []
+saveText = ""
 current_bian = "无"
 current_fenbian = "无"
 current_zhang = "无"
 current_jie = "无"
 current_text = "无"
 
-def save_current_tiao():
+def saveData():
     chunks.append({
         "编": current_bian,
         "分编": current_fenbian,
@@ -36,15 +37,28 @@ def save_current_tiao():
         "节": current_jie,
         "内容": current_text
     })
+
+
+def is_chinese_char_or_punct(ch):
+    return (
+        '\u4e00' <= ch <= '\u9fff' or 
+        '\u3000' <= ch <= '\u303f'
+    )
+    
 savedFlag=True
 
 for line in lines:
     if not line:
         continue
-    
+
+    if not is_chinese_char_or_punct(line[0]):
+        continue
+
     if bian_re.match(line):
         if not savedFlag:
-            save_current_tiao()
+            saveData()
+            saveText += current_text + "\n"
+        saveText += line + "\n"
         savedFlag = True
         current_bian = line
         current_fenbian = "无"
@@ -53,7 +67,9 @@ for line in lines:
         current_text = "无"
     elif fenbian_re.match(line):
         if not savedFlag:
-            save_current_tiao()
+            saveData()
+            saveText += current_text + "\n"
+        saveText += line + "\n"
         savedFlag = True
         current_fenbian = line
         current_zhang = "无"
@@ -61,27 +77,36 @@ for line in lines:
         current_text = "无"
     elif zhang_re.match(line) or line=="附 则":
         if not savedFlag:
-            save_current_tiao()
+            saveData()
+            saveText += current_text + "\n"
+        saveText += line + "\n"
         savedFlag = True
         current_zhang = line
         current_jie = "无"
         current_text = "无"
     elif jie_re.match(line):
         if not savedFlag:
-            save_current_tiao()
+            saveData()
+            saveText += current_text + "\n"
+        saveText += line + "\n"
         savedFlag = True
         current_jie = line
         current_text = "无"
     elif tiao_re.match(line):
         if not savedFlag:
-            save_current_tiao()
+            saveData()
+            saveText += current_text + "\n"
         savedFlag=False
         current_text = line
     else:
         if line=="附 录":
-            save_current_tiao()
+            saveData()
+            saveText += current_text + "\n"
             break
         current_text = current_text + line
 
 df = pd.DataFrame(chunks)
 df.to_csv("law_chunk.csv", index=False, encoding="utf-8-sig")
+
+with open("中国民法典.txt", "w", encoding="utf-8") as f:
+    f.write(saveText)
