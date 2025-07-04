@@ -5,7 +5,7 @@ tokenizer = ByteLevelBPETokenizer()
 
 files=["中国民法典.txt"]
 
-tokenizer.train(files=files, vocab_size=500, min_frequency=2, special_tokens=["<s>", "<pad>", "</s>", "<unk>"])
+tokenizer.train(files=files, vocab_size=2000, min_frequency=2, special_tokens=["<s>", "<pad>", "</s>", "<unk>"])
 
 save_dir = "BLBPE_tokenizer"
 
