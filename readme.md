@@ -20,4 +20,7 @@
     - 预处理：暂时舍弃了目录部分和附录部分，删除了角注和页码
 - RNG：
     - Tokenizer：使用ByteLevelBPE切词。在权衡了模型推理速度和内存负载之后，将vocab_size设置为了2000。
-    - Embedding模型：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
+    - Embedding模型：
+        - 重新训练：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
+        - 微调： 使用Qwen/Qwen3-Embedding-8B的架构和权重，但是微调
+    - Rerank模型：
