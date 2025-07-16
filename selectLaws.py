@@ -12,6 +12,7 @@ tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-Embedding-0.6B', padding_s
 model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B')
 
 model = model.to(device)
+model.eval()
 max_length = 8192
 
 def last_token_pool(last_hidden_states: Tensor,
@@ -28,7 +29,7 @@ def last_token_pool(last_hidden_states: Tensor,
 def get_detailed_instruct(task_description: str, query: str) -> str:
     return f'Instruct: {task_description}\nQuery:{query}'
 
-def generate_all_embeddings(text_list, batch_size=16):
+def generate_all_embeddings(text_list, batch_size=8):
     all_embeddings = []
 
     for i in tqdm(range(0, len(text_list), batch_size)):
@@ -49,6 +50,9 @@ def generate_all_embeddings(text_list, batch_size=16):
 
         embeddings_cpu = embeddings.cpu().numpy()
         all_embeddings.append(embeddings_cpu)
+
+        del batch_dict, outputs, embeddings
+        torch.cuda.empty_cache()
 
     final_embeddings = np.vstack(all_embeddings)
     return final_embeddings
@@ -76,7 +80,7 @@ df = pd.read_csv("Laws_All.csv")
 text_list = df["内容"].tolist()
 
 embeddings=generate_all_embeddings(text_list)
-np.save("law_embeddings.npy", embeddings)
+np.save("Laws_Embeddings.npy", embeddings)
 
 
 
