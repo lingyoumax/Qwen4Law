@@ -45,7 +45,6 @@ hf_tokenizer.add_special_tokens({
 hf_tokenizer.unk_token = None
 hf_tokenizer.bos_token = None
 
-# 其他属性
 hf_tokenizer.clean_up_tokenization_spaces = False
 hf_tokenizer.model_max_length = 131072
 hf_tokenizer.errors = "replace"
