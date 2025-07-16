@@ -3,15 +3,18 @@ import os
 from docx2pdf import convert
 import subprocess
 
-filename = 'laws'
+filename = 'test'
 if not os.path.exists(filename):
     os.mkdir(filename)
 
 url = 'https://flk.npc.gov.cn/api/?'
 
-types=["dfxfg","flfg","jcfg","sfjs","xffl","xzfg"]
-pages={"dfxfg":2485 , "flfg":70, "jcfg":1, "sfjs":86, "xffl":1, "xzfg":80}
+types={"flfg":"法律", "jcfg":"监察法规", "sfjs":"司法解释", "xffl":"宪法", "xzfg":"	行政法规"}
+pages={"flfg":70, "jcfg":1, "sfjs":86, "xffl":1, "xzfg":80}
 for type in types:
+    filename = type
+    if not os.path.exists(filename):
+        os.mkdir(filename)
     for page in range(1,pages[type]+1):
         headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -27,7 +30,7 @@ for type in types:
             continue
         try:
             for index in data_json['result']['data']:
-                if index["type"]!="法律" or index["status"]!="1":
+                if index["type"]!=types[type] or index["status"]!="1":
                     continue
                 id = index['id']
                 title = index['title']
