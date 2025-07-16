@@ -3,14 +3,10 @@ import os
 from docx2pdf import convert
 import subprocess
 
-filename = 'test'
-if not os.path.exists(filename):
-    os.mkdir(filename)
-
 url = 'https://flk.npc.gov.cn/api/?'
 
-types={"flfg":"法律", "jcfg":"监察法规", "sfjs":"司法解释", "xffl":"宪法", "xzfg":"	行政法规"}
-pages={"flfg":70, "jcfg":1, "sfjs":86, "xffl":1, "xzfg":80}
+types={"flfg":"法律", "jcfg":"监察法规", "sfjs":"司法解释", "xffl":"宪法", "xzfg":"行政法规","dfxfg":"地方性法规"}
+pages={"flfg":70, "jcfg":1, "sfjs":86, "xffl":1, "xzfg":80,"dfxfg":2492}
 for type in types:
     filename = type
     if not os.path.exists(filename):
@@ -51,9 +47,9 @@ for type in types:
                 with open(docx_filename, mode='wb') as f:
                     f.write(content)
     
-                pdf_filename = filename + '/'  + title + '.pdf'
-                convert(docx_filename, pdf_filename)
-                subprocess.call("taskkill /im WINWORD.EXE /f", shell=True)   
+                #pdf_filename = filename + '/'  + title + '.pdf'
+                #convert(docx_filename, pdf_filename)
+                #subprocess.call("taskkill /im WINWORD.EXE /f", shell=True)   
         except Exception as e:
             print(e)
             try:
