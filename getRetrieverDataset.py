@@ -37,7 +37,7 @@ data=[]
 
 def getPrompt(postive_doc, negative_docs):
     prompt=f"""
-请你根据正例文档生成一个用户查询(query)，这个查询能准确检索到该文档内容。  
+请你根据正例文档生成一个用户查询(query)，这个查询能准确检索到该文档内容，对于一些关键词，可以使用语义相近的词进行替代，以实现语义检索的效果。
 然后，从候选文档库里任选一篇与该查询无关或弱相关的文档，作为负例文档。
 返回时必须使用指定的返回格式返回。
 
@@ -61,18 +61,11 @@ columns_to_join = ['编', '分编', '章', '节', '内容']
 def row2doc(row):
     return ",".join([str(row[col]) for col in columns_to_join if pd.notnull(row[col])])
 
-directory='laws'
-fileend='.csv'
-csv_files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]
-dfs=[]
-for file in csv_files:
-    dfs.append(pd.read_csv(file))
-
-df = pd.concat(dfs, ignore_index=True)
-for i in tqdm(range(df.shape[0])):
+df=pd.read_csv("Laws.csv")
+for i in tqdm(range(0,df.shape[0],50)):
     row = df.iloc[i]
     postive_doc = row2doc(row)
-    for j in range(3):
+    for j in range(1):
         nums = random.sample(range(0, df.shape[0]), num_negative_docs)
         negative_docs=[]
         for k in nums:
