@@ -2,7 +2,7 @@ from tokenizers import Tokenizer, models, trainers, pre_tokenizers, decoders, no
 from modelscope import PreTrainedTokenizerFast, AutoTokenizer
 
 from tools import getFiles
-save_dir = "Tokenizer"
+save_dir = "RetrieverTokenizer"
 tk = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
 tokenizer = Tokenizer(models.BPE(continuing_subword_prefix="",end_of_word_suffix=""))
 split_pre_tokenizer = pre_tokenizers.Split(
