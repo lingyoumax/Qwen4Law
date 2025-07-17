@@ -2,18 +2,13 @@ import requests
 import pandas as pd
 import random
 from tqdm import tqdm
-import json
 import re
-from tools import getFiles
 
 def clean_text(text):
-    # 删除<think>标签及其内容 
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     
-    # 删除```json和```标记
     text = re.sub(r'```json|```', '', text)
     
-    # 删除两端的空白字符
     text = text.strip()
     
     return text
@@ -32,7 +27,7 @@ def generate_with_ollama(prompt, model="qwen3:32b"):
 
     return data["response"]
 
-num_negative_docs=10#在LLM的prompt中涉及的候选负例个数
+num_negative_docs=10
 data=[]
 
 def getPrompt(postive_doc, negative_docs):
@@ -56,7 +51,7 @@ def row2doc(row):
     return ",".join([str(row[col]) for col in columns_to_join if pd.notnull(row[col])])
 
 df=pd.read_csv("Laws_SelectedKMeans.csv")
-for i in tqdm(range(0,df.shape[0])):
+for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
     postive_doc = row2doc(row)
     for j in range(1):
@@ -70,12 +65,13 @@ for i in tqdm(range(0,df.shape[0])):
         result = generate_with_ollama(prompt)
         try:
             result=clean_text(result)
-            data.append([result, postive_doc, docs for docs in negative_docs])
+            data.append([result, postive_doc].extend(negative_docs))
         except Exception as e:
             print(e)
             print(result)
             print()
 
-columns = ["query", "postive_doc", f"negative_doc{i}" for i in range(num_negative_docs)]
+columns = ["query", "postive_doc"].extend([f"negative_doc{i}" for i in range(num_negative_docs)])
+
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
 RetrieverData_selfinstruct.to_csv("RetrieverDataset_selfinstruct.csv", index=False, encoding="utf-8-sig")
