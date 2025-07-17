@@ -60,11 +60,4 @@ hf_tokenizer.clean_up_tokenization_spaces = False
 hf_tokenizer.model_max_length = 131072
 hf_tokenizer.split_special_tokens = False
 
-
 hf_tokenizer.save_pretrained(save_dir)
-
-tokenizer = AutoTokenizer.from_pretrained(save_dir)
-
-print(tk.vocab_size)
-
-print(tokenizer.vocab_size)
