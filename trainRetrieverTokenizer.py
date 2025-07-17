@@ -53,9 +53,6 @@ hf_tokenizer._tokenizer.post_processor = processors.Sequence([
     )
 ])
 
-hf_tokenizer.unk_token = None
-hf_tokenizer.bos_token = None
-
 hf_tokenizer.clean_up_tokenization_spaces = False
 hf_tokenizer.model_max_length = 131072
 hf_tokenizer.split_special_tokens = False
