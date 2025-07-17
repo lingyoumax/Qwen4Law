@@ -37,48 +37,45 @@ data=[]
 
 def getPrompt(postive_doc, negative_docs):
     prompt=f"""
-请你根据正例文档生成一个用户查询(query)，这个查询能准确检索到该文档内容，对于一些关键词，可以使用语义相近的词进行替代，以实现语义检索的效果。
-然后，从候选文档库里任选一篇与该查询无关或弱相关的文档，作为负例文档。
-返回时必须使用指定的返回格式返回。
+请你根据正例文档生成一个用户查询(query)，这个查询能准确检索到该文档内容，对于一些关键词，可以使用语义相近的词进行替代，以实现语义检索的效果。同时需要注意，生成的用户查询不应该能查询到负例文档。
+输出中只需要包含生成的用户查询，不需要其它任何内容。
 
 【正例文档】
 {postive_doc}
 
-【候选文档列表】
+【负例文档列表】
 """
     for i in range(len(negative_docs)):
         prompt = prompt + f"{i+1}. {negative_docs[i]}\n"
     
-    prompt = prompt + """
-【返回格式】
-{"query":"用户查询",
-"negative_doc":"你选中的负例文档内容"
-}
-"""
     return prompt
+
 columns_to_join = ['编', '分编', '章', '节', '内容']
 
 def row2doc(row):
     return ",".join([str(row[col]) for col in columns_to_join if pd.notnull(row[col])])
 
-df=pd.read_csv("Laws.csv")
-for i in tqdm(range(0,df.shape[0],50)):
+df=pd.read_csv("Laws_SelectedKMeans.csv")
+for i in tqdm(range(0,df.shape[0])):
     row = df.iloc[i]
     postive_doc = row2doc(row)
     for j in range(1):
-        nums = random.sample(range(0, df.shape[0]), num_negative_docs)
+        candidate_indices = [x for x in range(df.shape[0]) if x != i]
+        nums = random.sample(candidate_indices, num_negative_docs)
+
         negative_docs=[]
         for k in nums:
             negative_docs.append(row2doc(df.iloc[k]))
         prompt=getPrompt(postive_doc, negative_docs)
         result = generate_with_ollama(prompt)
         try:
-            result_json=json.loads(clean_text(result))
-            data.append([result_json["query"], postive_doc, result_json["negative_doc"]])
+            result=clean_text(result)
+            data.append([result, postive_doc, docs for docs in negative_docs])
         except Exception as e:
             print(e)
             print(result)
             print()
 
-RetrieverData_selfinstruct = pd.DataFrame(data, columns=["query", "postive_doc", "negative_doc"])
+columns = ["query", "postive_doc", f"negative_doc{i}" for i in range(num_negative_docs)]
+RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
 RetrieverData_selfinstruct.to_csv("RetrieverDataset_selfinstruct.csv", index=False, encoding="utf-8-sig")
