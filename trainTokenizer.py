@@ -13,6 +13,8 @@ tokenizer.pre_tokenizer = pre_tokenizers.Sequence([
     split_pre_tokenizer,
     pre_tokenizers.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False)
 ])
+tokenizer.decoder=decoders.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False)
+tokenizer.normalizer = normalizers.NFC()
 
 trainer = trainers.BpeTrainer(
     vocab_size=tk.vocab_size,
@@ -38,8 +40,7 @@ hf_tokenizer.add_special_tokens({
     "additional_special_tokens": tk.special_tokens_map['additional_special_tokens']
 })
 
-hf_tokenizer._tokenizer.decoder=decoders.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False)
-hf_tokenizer._tokenizer.normalizer = normalizers.NFC()
+
 
 hf_tokenizer._tokenizer.post_processor = processors.Sequence([
     processors.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False),
@@ -57,7 +58,6 @@ hf_tokenizer.bos_token = None
 
 hf_tokenizer.clean_up_tokenization_spaces = False
 hf_tokenizer.model_max_length = 131072
-hf_tokenizer.errors = "replace"
 hf_tokenizer.split_special_tokens = False
 
 
