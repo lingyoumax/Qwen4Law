@@ -5,8 +5,9 @@ from modelscope import AutoTokenizer, AutoModel
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+from sklearn.cluster import KMeans
 
-from settings import device
+from settings import device, random_seed
 
 tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-Embedding-0.6B', padding_side='left')
 model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B')
@@ -76,14 +77,32 @@ def max_min_diverse_subset(embeddings, k=7000):
 
     return selected_indices
 
+def kmeans_diverse_subset(embeddings, k=7000):
+
+    kmeans = KMeans(n_clusters=k, random_state=random_seed, n_init="auto")
+    labels = kmeans.fit_predict(embeddings)
+    centers = kmeans.cluster_centers_
+
+    selected_indices = []
+    for i in range(k):
+        cluster_points = np.where(labels == i)[0]
+        center = centers[i]
+        distances = np.linalg.norm(embeddings[cluster_points] - center, axis=1)
+        closest_index = cluster_points[np.argmin(distances)]
+        selected_indices.append(closest_index)
+
+    return selected_indices
+
 df = pd.read_csv("Laws_All.csv")
 text_list = df["内容"].tolist()
 
 embeddings=generate_all_embeddings(text_list)
 np.save("Laws_Embeddings.npy", embeddings)
 
+indicesGreedy=max_min_diverse_subset(embeddings,7000)
+df_selectedGreedy = df.iloc[indicesGreedy]
+df_selectedGreedy.to_csv("Laws_SelectedGreedy.csv", index=False, encoding="utf-8-sig")
 
-
-indices=max_min_diverse_subset(embeddings,7000)
-df_selected = df.iloc[indices]
-df_selected.to_csv("Laws_Selected.csv", index=False, encoding="utf-8-sig")
+indiceskmeans=kmeans_diverse_subset(embeddings,7000)
+df_selectedkmeans = df.iloc[indiceskmeans]
+df_selectedkmeans.to_csv("Laws_SelectedKMeans.csv", index=False, encoding="utf-8-sig")
