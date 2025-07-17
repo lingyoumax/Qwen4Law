@@ -1,23 +1,14 @@
-from tokenizers import Tokenizer, models, trainers, pre_tokenizers, decoders, normalizers
+from tokenizers import Tokenizer, models, trainers, pre_tokenizers, decoders, normalizers, processors
 from modelscope import PreTrainedTokenizerFast, AutoTokenizer
 
 from tools import getFiles
 
 tk = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
-tokenizer = Tokenizer(models.BPE())
+tokenizer = Tokenizer(models.BPE(continuing_subword_prefix="",end_of_word_suffix=""))
 split_pre_tokenizer = pre_tokenizers.Split(
     pattern=r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+",
     behavior="isolated",
 )
-bytelevel_pre_tokenizer = pre_tokenizers.ByteLevel(
-    add_prefix_space=False,
-    trim_offsets=False,
-    use_regex=False,
-)
-tokenizer.pre_tokenizer = pre_tokenizers.Sequence([split_pre_tokenizer, bytelevel_pre_tokenizer])
-tokenizer.decoder = decoders.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False)
-
-tokenizer.normalizer = normalizers.NFC()
 
 trainer = trainers.BpeTrainer(
     vocab_size=tk.vocab_size,
@@ -41,6 +32,22 @@ hf_tokenizer.add_special_tokens({
     "pad_token": tk.special_tokens_map['pad_token'],
     "additional_special_tokens": tk.special_tokens_map['additional_special_tokens']
 })
+hf_tokenizer._tokenizer.pre_tokenizer = pre_tokenizers.Sequence([
+    split_pre_tokenizer,
+    pre_tokenizers.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False)
+])
+hf_tokenizer._tokenizer.decoder=decoders.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False)
+hf_tokenizer._tokenizer.normalizer = normalizers.NFC()
+hf_tokenizer._tokenizer.post_processor = processors.Sequence([
+    processors.ByteLevel(add_prefix_space=False, trim_offsets=False, use_regex=False),
+    processors.TemplateProcessing(
+        single="$A <|endoftext|>",
+        pair="$A $B <|endoftext|>",
+        special_tokens=[
+            ("<|endoftext|>", hf_tokenizer.convert_tokens_to_ids("<|endoftext|>"))
+        ]
+    )
+])
 
 hf_tokenizer.unk_token = None
 hf_tokenizer.bos_token = None
