@@ -6,14 +6,13 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from settings import device, random_seed
+from settings import device, max_length
 
 tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-Embedding-0.6B', padding_side='left')
 model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B')
 
 model = model.to(device)
 model.eval()
-max_length = 8192
 
 def last_token_pool(last_hidden_states: Tensor,
                  attention_mask: Tensor) -> Tensor:
