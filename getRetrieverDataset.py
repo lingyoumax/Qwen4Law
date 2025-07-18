@@ -3,6 +3,7 @@ import pandas as pd
 import random
 from tqdm import tqdm
 import re
+from settings import num_negative_docs
 
 def clean_text(text):
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
@@ -27,7 +28,7 @@ def generate_with_ollama(prompt, model="qwen3:32b"):
 
     return data["response"]
 
-num_negative_docs=10
+
 data=[]
 
 def getPrompt(postive_doc, negative_docs):
