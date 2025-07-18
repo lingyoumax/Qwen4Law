@@ -5,7 +5,6 @@ from modelscope import AutoTokenizer, AutoModel
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from sklearn.cluster import KMeans
 
 from settings import device, random_seed
 
@@ -60,36 +59,24 @@ def generate_all_embeddings(text_list, batch_size=8):
 
 def max_min_diverse_subset(embeddings, k=7000):
 
-    N = embeddings.shape[0]
+    embeddings_tensor = torch.tensor(embeddings, device=device)
+    
+    embeddings_normalized = embeddings_tensor / torch.norm(embeddings_tensor, dim=1, keepdim=True)
+    
+    N = embeddings_normalized.shape[0]
     selected_indices = []
 
-    first_index = np.random.randint(0, N)
+    first_index = torch.randint(0, N, (1,)).item()
     selected_indices.append(first_index)
 
-    dist_to_selected = np.linalg.norm(embeddings - embeddings[first_index], axis=1)
+    dist_to_selected = 1 - torch.mv(embeddings_normalized, embeddings_normalized[first_index])
 
     for _ in tqdm(range(1, k)):
-        next_index = np.argmax(dist_to_selected)
+        next_index = torch.argmax(dist_to_selected).item()
         selected_indices.append(next_index)
 
-        dist_new = np.linalg.norm(embeddings - embeddings[next_index], axis=1)
-        dist_to_selected = np.minimum(dist_to_selected, dist_new)
-
-    return selected_indices
-
-def kmeans_diverse_subset(embeddings, k=7000):
-
-    kmeans = KMeans(n_clusters=k, random_state=random_seed, n_init="auto")
-    labels = kmeans.fit_predict(embeddings)
-    centers = kmeans.cluster_centers_
-
-    selected_indices = []
-    for i in range(k):
-        cluster_points = np.where(labels == i)[0]
-        center = centers[i]
-        distances = np.linalg.norm(embeddings[cluster_points] - center, axis=1)
-        closest_index = cluster_points[np.argmin(distances)]
-        selected_indices.append(closest_index)
+        dist_new = 1 - torch.mv(embeddings_normalized, embeddings_normalized[next_index])
+        dist_to_selected = torch.minimum(dist_to_selected, dist_new)
 
     return selected_indices
 
@@ -99,10 +86,6 @@ text_list = df["内容"].tolist()
 embeddings=generate_all_embeddings(text_list)
 np.save("Laws_Embeddings.npy", embeddings)
 
-indicesGreedy=max_min_diverse_subset(embeddings,7000)
-df_selectedGreedy = df.iloc[indicesGreedy]
-df_selectedGreedy.to_csv("Laws_SelectedGreedy.csv", index=False, encoding="utf-8-sig")
-
-indiceskmeans=kmeans_diverse_subset(embeddings,7000)
-df_selectedkmeans = df.iloc[indiceskmeans]
-df_selectedkmeans.to_csv("Laws_SelectedKMeans.csv", index=False, encoding="utf-8-sig")
+indices=max_min_diverse_subset(embeddings,10000)
+df_selected = df.iloc[indices]
+df_selected.to_csv("Laws_Selected.csv", index=False, encoding="utf-8-sig")
