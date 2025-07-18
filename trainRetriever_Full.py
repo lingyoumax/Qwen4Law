@@ -1,6 +1,93 @@
+from datasets import Dataset
+import pandas as pd
 from modelscope import AutoConfig, AutoModel, AutoTokenizer
-from settings import device
+from transformers import BatchEncoding
+import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from settings import num_negative_docs, device, max_length, random_seed
+
+test_ratio=0.2
+batch_size=4
+lr=2e-5
+n_epoch=100
+
+df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
+
+def row_to_sample(row):
+    sample = {
+        "query": row["query"],
+        "positive": row["postive_doc"],
+        "negatives": [row[f"negative_doc{i}"] for i in range(num_negative_docs)]
+    }
+    return sample
+
+data = [row_to_sample(row) for _, row in df.iterrows()]
+
+dataset = Dataset.from_list(data)
+dataset_split = dataset.train_test_split(test_size = test_ratio, seed = random_seed)
+train_dataset = dataset_split["train"]
+test_dataset = dataset_split["test"]
 
 config = AutoConfig.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
 model = AutoModel.from_config(config).to(device)
 tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
+
+def tokenize_function(example):
+    query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+    positive = tokenizer(example["positive"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+    negatives = tokenizer(example["negatives"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+
+    features = {
+        "query_input_ids": query["input_ids"][0],
+        "query_attention_mask": query["attention_mask"][0],
+        "positive_input_ids": positive["input_ids"][0],
+        "positive_attention_mask": positive["attention_mask"][0]
+    }
+
+    for i in range(num_negative_docs):
+        features[f"negative_input_ids_{i}"] = negatives["input_ids"][i]
+        features[f"negative_attention_mask_{i}"] = negatives["attention_mask"][i]
+
+    return features
+
+tokenized_train_dataset = train_dataset.map(tokenize_function, remove_columns=train_dataset.column_names)
+tokenized_test_dataset = test_dataset.map(tokenize_function, remove_columns=test_dataset.column_names)
+
+def collate_fn(batch):
+    batch_dict = {}
+
+    for key in batch[0]:
+        value = torch.stack([torch.tensor(item[key]) for item in batch])
+        batch_dict[key] = value.to(device)
+
+    return batch_dict
+
+train_dataloader = DataLoader(
+    tokenized_train_dataset,
+    batch_size = batch_size,
+    shuffle = True,
+    collate_fn=collate_fn
+)
+test_dataloader = DataLoader(
+    tokenized_test_dataset,
+    batch_size = batch_size,
+    shuffle = True,
+    collate_fn=collate_fn
+)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+
+for epoch in tqdm(range(n_epoch)):
+    for batch in train_dataloader:
+        query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
+        query_embedding = model(**query_dict)
+
+        positive_dict=BatchEncoding({"input_ids":batch["positive_input_ids"],"attention_mask":batch["positive_attention_mask"]})
+        positive_embedding = model(**positive_dict)
+
+        negative_embeddings=[]
+        for i in range(num_negative_docs):
+            negative_dict_i=BatchEncoding({"input_ids":batch[f"negative_input_ids_{i}"],"attention_mask":batch[f"negative_attention_mask_{i}"]})
+            negative_embeddings.append(model(**negative_dict_i))
