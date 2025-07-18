@@ -1,22 +1,20 @@
 # 项目目的
 本项目计划基于Qwen3搭建一个法律知识信息问答系统。
 # 技术路线
-- 总数据集：
-    - 范围：生效的宪法、法律法规、行政法规、监察法规、司法解释、地方性法规
-    - 来源：[国家法律法规数据库](https://flk.npc.gov.cn/index.html)
-    - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
-- Retriever训练数据集：
-    - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用K-Means算法获得分布均匀、代表性强的子集，每个簇中距离质心最近的元素进入子集中。
-    - 随机选取chunk作为正例样本，通过ollama部署的Qwen3:32b模型并使用self instruct方法自动化生成(query, postive docs, negative docs)三元组
-    - 使用MoDS方法再次筛选，从上一步骤的结果中筛选出高质量的训练数据
-    - 数据集评估:
 - RNG：
-    - Tokenizer：
-        - 重新训练：使用BPE切词。为了对齐Qwen3-Embedding-0.6B架构使用的Embedding Lookup，将vocab_size设置为了151669。但是重新训练的Tokenizer只能给重新训练的Embedding模型和Rerank模型用
-        - 直接使用：使用已有的Qwen/Qwen3-Embedding-0.6B对应的Tokenizer
     - Retriever：
-        - 重新训练：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
-        - 微调： 使用Qwen/Qwen3-Embedding-0.6B的架构和权重，使用LoRA和QLoRA分别微调
+        - 数据集：
+            - 范围：生效的宪法、法律法规、行政法规、监察法规、司法解释、地方性法规
+            - 来源：[国家法律法规数据库](https://flk.npc.gov.cn/index.html)
+            - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
+            - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，在权衡了GPU的推理速度和时间之后，将子集的大小设置为10000。
+            - 随机选取chunk作为正例样本，通过ollama部署的Qwen3:32b模型并使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
+        - Tokenizer：
+            - 重新训练：使用BPE切词。为了对齐Qwen3-Embedding-0.6B架构使用的Embedding Lookup，将vocab_size设置为了151669。但是重新训练的Tokenizer只能给重新训练的Embedding模型和Rerank模型用
+            - 直接使用：使用已有的Qwen/Qwen3-Embedding-0.6B对应的Tokenizer
+        - Embedding 模型：
+            - 重新训练：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
+            - 微调： 使用Qwen/Qwen3-Embedding-0.6B的架构和权重，使用LoRA和QLoRA分别微调
     - 
 # 结果及分析
 ## Retriever
@@ -26,10 +24,7 @@
 |:---:|:---:|:---:|
 |  # of Mean Token  | 54.17386496216359 | 22.577796558983728 |
 
-可以看出，重新训练的Tokenizer所需的平均Token数量更少，这是因为它是根据该任务特定的语料库作训练的，在优化上做得更好。
-
-### 数据集选取
-![evalLawsSelectedKMeans](Figs/evalLawsSelectedKMeans.jpg)
+可以看出，重新训练的Tokenizer所需的平均Token数量更少，这是因为它是根据该任务特定的语料库作训练的，在针对性上做得更好。
 
 # 过程中的思考：
 ## 总方向
@@ -79,5 +74,6 @@
 - 原本计划将中国所有法律法规都引入，但是发现如果全部引入，那么微调和训练embedding的问答数据库所需时间需要一年，不符合实际，所以必须减少数据库的数量
 ## 20250716
 - 决定使用降采样的方式减少数据库数量，初步计划按照顺序每50个条文采样一个条文，但是这样忽略了文本中语义的重要性。为了解决这个问题，使用Qwen3-Embedding-0.6B将法律条文信息转为向量信息，再在向量空间中选出覆盖性最强、彼此差异最大的子集。
-- 选择子集时，刚开始使用贪心算法寻找子集，但是在出来的结果存在如下图所示的聚集现象。为了解决这一点，改用k-means聚类算法聚类k个点，然后从这个k个类别中选择离质心最近的点作为子集的元素。
-![evalLawsSelectedGreedy](Figs/evalLawsSelectedGreedy.jpg)
+## 20250718
+- 发现之前用的向量距离是欧式距离，但是该任务中需要的是余弦距离。这是粗心犯的错
+- 在降维法律的embedding向量时使用的是PCA，导致可视化分析不可靠
