@@ -14,6 +14,8 @@
             - 直接使用：使用已有的Qwen/Qwen3-Embedding-0.6B对应的Tokenizer
         - Embedding 模型：
             - 重新训练：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
+                - 由于
+                - 损失函数使用Qwen3-Embedding的损失函数。
             - 微调： 使用Qwen/Qwen3-Embedding-0.6B的架构和权重，使用LoRA和QLoRA分别微调
     - 
 # 结果及分析
@@ -77,4 +79,5 @@
 ## 20250718
 - 发现之前用的向量距离是欧式距离，但是该任务中需要的是余弦距离。这是粗心犯的错
 - 在降维法律的embedding向量时使用的是PCA，导致可视化分析不可靠。
+- 在设计贪心算法时，原来使用的是Numpy，生成一次结果需要两小时半，速度太慢了，改用pytorch并使用cuda加速，同时优化了算法强化了计算的并行性，现在计算一次时间只需要2分钟。
 - 在使用self instruct生成训练retriever的embedding model的数据集时，发现提示词的设计密切关系到生成的query的质量。这说明提示词的设计很有必要性。
