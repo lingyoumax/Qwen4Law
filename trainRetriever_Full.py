@@ -9,7 +9,7 @@ from tqdm import tqdm
 from settings import num_negative_docs, device, max_length, random_seed
 
 test_ratio=0.2
-batch_size=4
+batch_size=8
 lr=2e-5
 n_epoch=100
 
