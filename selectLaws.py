@@ -25,9 +25,6 @@ def last_token_pool(last_hidden_states: Tensor,
         return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
 
-def get_detailed_instruct(task_description: str, query: str) -> str:
-    return f'Instruct: {task_description}\nQuery:{query}'
-
 def generate_all_embeddings(text_list, batch_size=8):
     all_embeddings = []
 
