@@ -23,6 +23,15 @@ def row_to_sample(row):
     }
     return sample
 
+def last_token_pool(last_hidden_states, attention_mask):
+    left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+    if left_padding:
+        return last_hidden_states[:, -1]
+    else:
+        sequence_lengths = attention_mask.sum(dim=1) - 1
+        batch_size = last_hidden_states.shape[0]
+        return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
+
 data = [row_to_sample(row) for _, row in df.iterrows()]
 
 dataset = Dataset.from_list(data)
@@ -32,6 +41,7 @@ test_dataset = dataset_split["test"]
 
 config = AutoConfig.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
 model = AutoModel.from_config(config).to(device)
+model.train()
 tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
 
 def tokenize_function(example):
@@ -82,12 +92,16 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 for epoch in tqdm(range(n_epoch)):
     for batch in train_dataloader:
         query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
-        query_embedding = model(**query_dict)
+        query_output = model(**query_dict)
+        query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])
 
         positive_dict=BatchEncoding({"input_ids":batch["positive_input_ids"],"attention_mask":batch["positive_attention_mask"]})
-        positive_embedding = model(**positive_dict)
+        positive_output = model(**positive_dict)
+        positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])
 
         negative_embeddings=[]
         for i in range(num_negative_docs):
             negative_dict_i=BatchEncoding({"input_ids":batch[f"negative_input_ids_{i}"],"attention_mask":batch[f"negative_attention_mask_{i}"]})
-            negative_embeddings.append(model(**negative_dict_i))
+            negative_output_i = model(**negative_dict_i)
+            negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])
+            negative_embeddings.append(negative_embedding_i)
