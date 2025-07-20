@@ -9,7 +9,7 @@ from tqdm import tqdm
 from settings import num_negative_docs, device, max_length, random_seed
 
 test_ratio=0.2
-batch_size=8
+batch_size=2
 lr=2e-5
 n_epoch=100
 
@@ -30,7 +30,7 @@ def last_token_pool(last_hidden_states, attention_mask):
     else:
         sequence_lengths = attention_mask.sum(dim=1) - 1
         batch_size = last_hidden_states.shape[0]
-        return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
+        return last_hidden_states[torch.arange(batch_size, device=device), sequence_lengths]
 
 data = [row_to_sample(row) for _, row in df.iterrows()]
 
