@@ -2,13 +2,15 @@ import pdfplumber
 import re
 import pandas as pd
 from tools import getFiles
+from tqdm import tqdm
 
 def is_chinese_char_or_punct(ch):
     return (
         '\u4e00' <= ch <= '\u9fff' or  # 中文字符
         '\u3000' <= ch <= '\u303f' or  # 中文标点符号
         ch.isdigit() or                # 阿拉伯数字（0-9）
-        ch == ' '                      # 空格
+        ch == ' '  or                    # 空格
+        ch in " （）【】：；“”‘’\"\'<>，。,.、/！"
     )
 
 def cleanText(text):
@@ -26,7 +28,7 @@ fenbian_re = re.compile(r"^第[零一二三四五六七八九十百]+分编\s+")
 zhang_re = re.compile(r"^第[零一二三四五六七八九十百千]+章\s+")
 jie_re = re.compile(r"^第[零一二三四五六七八九十百千]+节\s+")
 tiao_re = re.compile(r"^第[零一二三四五六七八九十百千]+条\s+")
-for law in laws:
+for law in tqdm(laws):
     text_all = ""
     with pdfplumber.open(f"{directory}/{law}{fileend}") as pdf:
         for page in pdf.pages:
@@ -55,7 +57,8 @@ for law in laws:
         if not line:
             continue
 
-        if not is_chinese_char_or_punct(line[0]):
+        line=cleanText(line)
+        if line.replace(" ", "").isdigit():
             continue
 
         if bian_re.match(line):
@@ -66,7 +69,7 @@ for law in laws:
                 "分编": current_fenbian,
                 "章": current_zhang,
                 "节": current_jie,
-                "内容": cleanText(current_text)
+                "内容": current_text
                 })
                 saveText += current_text + "\n"
 
@@ -85,9 +88,9 @@ for law in laws:
                 "分编": current_fenbian,
                 "章": current_zhang,
                 "节": current_jie,
-                "内容": cleanText(current_text)
+                "内容": current_text
                 })
-                saveText += cleanText(current_text) + "\n"
+                saveText += current_text + "\n"
             saveText += line + "\n"
             savedFlag = True
             current_fenbian = line
@@ -102,9 +105,9 @@ for law in laws:
                 "分编": current_fenbian,
                 "章": current_zhang,
                 "节": current_jie,
-                "内容": cleanText(current_text)
+                "内容": current_text
                 })
-                saveText += cleanText(current_text) + "\n"
+                saveText += current_text + "\n"
             saveText += line + "\n"
             savedFlag = True
             current_zhang = line
@@ -118,9 +121,9 @@ for law in laws:
                 "分编": current_fenbian,
                 "章": current_zhang,
                 "节": current_jie,
-                "内容": cleanText(current_text)
+                "内容": current_text
                 })
-                saveText += cleanText(current_text) + "\n"
+                saveText += current_text + "\n"
             saveText += line + "\n"
             savedFlag = True
             current_jie = line
@@ -133,9 +136,9 @@ for law in laws:
                 "分编": current_fenbian,
                 "章": current_zhang,
                 "节": current_jie,
-                "内容": cleanText(current_text)
+                "内容": current_text
                 })
-                saveText += cleanText(current_text) + "\n"
+                saveText += current_text + "\n"
             savedFlag=False
             current_text = line
         else:
@@ -146,11 +149,20 @@ for law in laws:
     "分编": current_fenbian,
     "章": current_zhang,
     "节": current_jie,
-    "内容": cleanText(current_text)
+    "内容": current_text
     })
-    saveText += cleanText(current_text) + "\n"
+    saveText += current_text + "\n"
     df = pd.DataFrame(chunks)
     df.to_csv(f"{directory}/{law}.csv", index=False, encoding="utf-8-sig")
 
     with open(f"{directory}/{law}.txt", "w", encoding="utf-8") as f:
         f.write(saveText)
+
+fileend='.csv'
+csv_files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]
+dfs=[]
+for file in tqdm(csv_files):
+    dfs.append(pd.read_csv(file))
+df = pd.concat(dfs, ignore_index=True)
+
+df.to_csv(f"Laws_All.csv", index=False, encoding="utf-8-sig")
