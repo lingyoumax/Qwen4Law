@@ -7,7 +7,7 @@ my_tokenizer = AutoTokenizer.from_pretrained("Tokenizer", padding_side='left')
 
 directory='laws'
 fileend='.txt'
-files = [f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]
+files = [f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]+["RetrieverQuery.txt"]
 
 total_tokens_qwen = 0
 total_tokens_mine = 0

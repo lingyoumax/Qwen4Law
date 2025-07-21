@@ -17,14 +17,15 @@ tokenizer.decoder=decoders.ByteLevel(add_prefix_space=False, trim_offsets=False,
 tokenizer.normalizer = normalizers.NFC()
 
 trainer = trainers.BpeTrainer(
-    vocab_size=tk.vocab_size,
+    #vocab_size=tk.vocab_size,
+    vocab_size=20000,
     min_frequency=2,
 )
 
 directory='laws'
 fileend='.txt'
 
-tokenizer.train(files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)], trainer=trainer)
+tokenizer.train(files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]+["RetrieverQuery.txt"], trainer=trainer)
 #tokenizer.add_special_tokens(tk.all_special_tokens)
 tokenizer.model.save(save_dir)
 

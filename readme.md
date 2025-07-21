@@ -81,3 +81,5 @@
 - 在降维法律的embedding向量时使用的是PCA，导致可视化分析不可靠。
 - 在设计贪心算法时，原来使用的是Numpy，生成一次结果需要两小时半，速度太慢了，改用pytorch并使用cuda加速，同时优化了算法强化了计算的并行性，现在计算一次时间只需要2分钟。
 - 在使用self instruct生成训练retriever的embedding model的数据集时，发现提示词的设计密切关系到生成的query的质量。这说明提示词的设计很有必要性。
+## 20250721
+- 在重训练Embedding模型时，发现按照原始qwen3-embedding-0.6b的设置去训练会爆内存。经过分析发现，这是因为Embedding模型设置的max_length太大了。同时，经过类比分析，认为没有必要将Retriever的tokenizer的vocab_size设定为与原文一致。这说明每个参数的大小设定都必须有根据不能盲目或者跟风设置。

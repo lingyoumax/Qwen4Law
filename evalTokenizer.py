@@ -1,14 +1,15 @@
 import matplotlib.pyplot as plt
 from tokenizers import ByteLevelBPETokenizer
-from transformers import AutoTokenizer
+from modelscope import AutoTokenizer
 import os
+from tqdm import tqdm
 
 from tools import getFiles
 
 directory='laws'
 fileend='.txt'
 
-files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]
+files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]+["RetrieverQuery.txt"]
 
 tk = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
 special_tokens = tk.all_special_tokens
@@ -16,7 +17,7 @@ special_tokens = tk.all_special_tokens
 x = []
 y = []
 
-for size in range(100, 2001, 100):
+for size in tqdm(range(200, 20001, 200)):
     x.append(size)
     tokenizer = ByteLevelBPETokenizer()
     
@@ -42,7 +43,7 @@ plt.figure(figsize=(10, 6))
 plt.plot(x, y)
 plt.xlabel('Vocab Size')
 plt.ylabel('Mean # of Tokens per Line')
-plt.title('Effect of Vocab Size on Tokenization (Qwen3 Special Tokens)')
+plt.title('Effect of Vocab Size on Tokenization')
 plt.grid(True)
 
 os.makedirs("Figs", exist_ok=True)
