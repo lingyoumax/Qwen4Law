@@ -53,26 +53,36 @@ def generate_all_embeddings(text_list, batch_size=4):
     final_embeddings = np.vstack(all_embeddings)
     return final_embeddings
 
-def max_min_diverse_subset(embeddings, k=7000):
-
+def max_min_diverse_subset(text_list, embeddings, k=7000):
     embeddings_tensor = torch.tensor(embeddings, device=device)
-    
     embeddings_normalized = embeddings_tensor / torch.norm(embeddings_tensor, dim=1, keepdim=True)
-    
+
     N = embeddings_normalized.shape[0]
     selected_indices = []
 
-    first_index = torch.randint(0, N, (1,)).item()
+    while True:
+        first_index = torch.randint(0, N, (1,)).item()
+        if text_list[first_index].strip().endswith("。"):
+            break
     selected_indices.append(first_index)
 
     dist_to_selected = 1 - torch.mv(embeddings_normalized, embeddings_normalized[first_index])
 
-    for _ in tqdm(range(1, k)):
+    pbar = tqdm(total=k - 1)
+    while len(selected_indices) < k:
         next_index = torch.argmax(dist_to_selected).item()
+
+        if not text_list[next_index].strip().endswith("。"):
+            dist_to_selected[next_index] = 0
+            continue
+
         selected_indices.append(next_index)
 
         dist_new = 1 - torch.mv(embeddings_normalized, embeddings_normalized[next_index])
         dist_to_selected = torch.minimum(dist_to_selected, dist_new)
+
+        pbar.update(1)
+    pbar.close()
 
     return selected_indices
 
@@ -82,6 +92,6 @@ text_list = df["内容"].tolist()
 embeddings=generate_all_embeddings(text_list)
 np.save("Laws_Embeddings.npy", embeddings)
 
-indices=max_min_diverse_subset(embeddings,10000)
+indices=max_min_diverse_subset(text_list, embeddings,10000)
 df_selected = df.iloc[indices]
 df_selected.to_csv("Laws_Selected.csv", index=False, encoding="utf-8-sig")
