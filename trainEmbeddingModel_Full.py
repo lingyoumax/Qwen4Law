@@ -136,3 +136,5 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         optimizer.step()
 
     tqdm.write(f"Epoch {epoch}: Avg Loss = {loss:.4f}")
+
+torch.save(model, 'EmbeddingModel_Full.pth')
