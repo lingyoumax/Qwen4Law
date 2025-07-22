@@ -91,57 +91,48 @@ test_dataloader = DataLoader(
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
-def compute_similarity(a, b):
-    a = F.normalize(a, dim=-1)
-    b = F.normalize(b, dim=-1)
-    return torch.matmul(a, b.T)
 
-for epoch in tqdm(range(n_epoch)):
+for epoch in tqdm(range(n_epoch), desc="Training"):
     for batch in train_dataloader:
         optimizer.zero_grad()
         query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
         query_output = model(**query_dict)
-        query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])
+        query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])#batch_size * embedding_length
+        query_embedding = F.normalize(query_embedding, dim=1)
 
         positive_dict=BatchEncoding({"input_ids":batch["positive_input_ids"],"attention_mask":batch["positive_attention_mask"]})
         positive_output = model(**positive_dict)
-        positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])
+        positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])#batch_size * embedding_length
+        positive_embedding = F.normalize(positive_embedding, dim=1)
 
         negative_embeddings=[]
         for i in range(num_negative_docs):
             negative_dict_i=BatchEncoding({"input_ids":batch[f"negative_input_ids_{i}"],"attention_mask":batch[f"negative_attention_mask_{i}"]})
             negative_output_i = model(**negative_dict_i)
-            negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])
+            negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])#batch_size * embedding_length
+            negative_embedding_i = F.normalize(negative_embedding_i, dim=1)
             negative_embeddings.append(negative_embedding_i)
         
         B = query_embedding.size(0)
-        D = query_embedding.size(1)
 
-        negatives_stacked = torch.stack(negative_embeddings, dim=1).view(B * num_negative_docs, D)
+        negatives_stacked = torch.stack(negative_embeddings)
 
         sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature
-        sim_q_q = compute_similarity(query_embedding, query_embedding) / temperature
-        sim_pos_dj = compute_similarity(positive_embedding, query_embedding) / temperature 
-        sim_q_dj = compute_similarity(query_embedding, positive_embedding) / temperature
-        sim_q_neg = compute_similarity(query_embedding, negatives_stacked)
+        sim_q_neg=torch.sum(query_embedding.unsqueeze(0) * negatives_stacked, dim=2).T / temperature
+        sim_q_q=query_embedding @ query_embedding.T / temperature
+        sim_pos_dj = positive_embedding @ positive_embedding.T / temperature
+        sim_q_dj = query_embedding @ positive_embedding.T /temperature
 
-        m_ij = torch.ones_like(sim_q_q)
-        with torch.no_grad():
-            for i in range(B):
-                for j in range(B):
-                    if i == j:
-                        continue
-                    if sim_q_q[i, j] > sim_q_pos[i] + 0.1 or torch.equal(batch["query_input_ids"][j], batch["positive_input_ids"][i]):
-                        m_ij[i, j] = 0
+        m = torch.ones_like(sim_q_q, dtype=torch.bool, device=device)
+        diag_indices = torch.arange(sim_q_q.size(0), device=device)
+        m[diag_indices, diag_indices] = False
+        thresholds = sim_q_pos.unsqueeze(1).expand(-1, B) + 0.1
+        too_similar = sim_q_q > thresholds
+        m = m & (~too_similar)
 
-        Zi = torch.exp(sim_q_pos) \
-            + torch.sum(torch.exp(sim_q_neg), dim=1) \
-            + torch.sum(m_ij * torch.exp(sim_q_q), dim=1) \
-            + torch.sum(m_ij * torch.exp(sim_pos_dj), dim=1) \
-            + torch.sum(m_ij * torch.exp(sim_q_dj), dim=1)
-
-        loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Zi))
+        Z = torch.exp(sim_q_pos) + torch.sum(torch.exp(sim_q_neg), dim=1) + torch.sum(m * torch.exp(sim_q_q), dim=1) + torch.sum(m * torch.exp(sim_pos_dj), dim=1)+ torch.sum(m * torch.exp(sim_q_dj), dim=1)
+        loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Z))
         loss.backward()
         optimizer.step()
 
-    print(f"Epoch {epoch}: Loss = {loss.item():.4f}")
+    tqdm.write(f"Epoch {epoch}: Avg Loss = {loss:.4f}")
