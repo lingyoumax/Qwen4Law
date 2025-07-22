@@ -114,21 +114,17 @@ for epoch in tqdm(range(n_epoch)):
             negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])
             negative_embeddings.append(negative_embedding_i)
         
-        # [B, D] embeddings
         B = query_embedding.size(0)
         D = query_embedding.size(1)
 
-        # Stack hard negatives
         negatives_stacked = torch.stack(negative_embeddings, dim=1).view(B * num_negative_docs, D)
 
-        # Compute similarities
-        sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature  # shape [B]
-        sim_q_q = compute_similarity(query_embedding, query_embedding) / temperature  # [B, B]
-        sim_pos_dj = compute_similarity(positive_embedding, query_embedding) / temperature  # [B, B]
-        sim_q_dj = compute_similarity(query_embedding, positive_embedding) / temperature  # [B, B]
-        sim_q_neg = compute_similarity(query_embedding, negatives_stacked)  # [B, B * K]
+        sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature
+        sim_q_q = compute_similarity(query_embedding, query_embedding) / temperature
+        sim_pos_dj = compute_similarity(positive_embedding, query_embedding) / temperature 
+        sim_q_dj = compute_similarity(query_embedding, positive_embedding) / temperature
+        sim_q_neg = compute_similarity(query_embedding, negatives_stacked)
 
-        # Build m_ij mask for (q_i, q_j) and (q_i, d_j)
         m_ij = torch.ones_like(sim_q_q)
         with torch.no_grad():
             for i in range(B):
@@ -138,7 +134,6 @@ for epoch in tqdm(range(n_epoch)):
                     if sim_q_q[i, j] > sim_q_pos[i] + 0.1 or torch.equal(batch["query_input_ids"][j], batch["positive_input_ids"][i]):
                         m_ij[i, j] = 0
 
-        # Build Zi
         Zi = torch.exp(sim_q_pos) \
             + torch.sum(torch.exp(sim_q_neg), dim=1) \
             + torch.sum(m_ij * torch.exp(sim_q_q), dim=1) \
