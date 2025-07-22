@@ -5,6 +5,7 @@ from transformers import BatchEncoding
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import torch.nn.functional as F
 
 from settings import num_negative_docs, device, max_length, random_seed
 
@@ -12,6 +13,7 @@ test_ratio=0.2
 batch_size=2
 lr=2e-5
 n_epoch=100
+temperature = 0.05
 
 df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
 
@@ -89,8 +91,14 @@ test_dataloader = DataLoader(
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
+def compute_similarity(a, b):
+    a = F.normalize(a, dim=-1)
+    b = F.normalize(b, dim=-1)
+    return torch.matmul(a, b.T)
+
 for epoch in tqdm(range(n_epoch)):
     for batch in train_dataloader:
+        optimizer.zero_grad()
         query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
         query_output = model(**query_dict)
         query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])
@@ -105,3 +113,40 @@ for epoch in tqdm(range(n_epoch)):
             negative_output_i = model(**negative_dict_i)
             negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])
             negative_embeddings.append(negative_embedding_i)
+        
+        # [B, D] embeddings
+        B = query_embedding.size(0)
+        D = query_embedding.size(1)
+
+        # Stack hard negatives
+        negatives_stacked = torch.stack(negative_embeddings, dim=1).view(B * num_negative_docs, D)
+
+        # Compute similarities
+        sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature  # shape [B]
+        sim_q_q = compute_similarity(query_embedding, query_embedding) / temperature  # [B, B]
+        sim_pos_dj = compute_similarity(positive_embedding, query_embedding) / temperature  # [B, B]
+        sim_q_dj = compute_similarity(query_embedding, positive_embedding) / temperature  # [B, B]
+        sim_q_neg = compute_similarity(query_embedding, negatives_stacked)  # [B, B * K]
+
+        # Build m_ij mask for (q_i, q_j) and (q_i, d_j)
+        m_ij = torch.ones_like(sim_q_q)
+        with torch.no_grad():
+            for i in range(B):
+                for j in range(B):
+                    if i == j:
+                        continue
+                    if sim_q_q[i, j] > sim_q_pos[i] + 0.1 or torch.equal(batch["query_input_ids"][j], batch["positive_input_ids"][i]):
+                        m_ij[i, j] = 0
+
+        # Build Zi
+        Zi = torch.exp(sim_q_pos) \
+            + torch.sum(torch.exp(sim_q_neg), dim=1) \
+            + torch.sum(m_ij * torch.exp(sim_q_q), dim=1) \
+            + torch.sum(m_ij * torch.exp(sim_pos_dj), dim=1) \
+            + torch.sum(m_ij * torch.exp(sim_q_dj), dim=1)
+
+        loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Zi))
+        loss.backward()
+        optimizer.step()
+
+    print(f"Epoch {epoch}: Loss = {loss.item():.4f}")

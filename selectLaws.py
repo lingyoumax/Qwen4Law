@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from settings import device, max_length
+from settings import device
+qwen_max_length=8192
 
 tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-Embedding-0.6B', padding_side='left')
 model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B')
@@ -25,7 +26,7 @@ def last_token_pool(last_hidden_states: Tensor,
         return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
 
-def generate_all_embeddings(text_list, batch_size=8):
+def generate_all_embeddings(text_list, batch_size=4):
     all_embeddings = []
 
     for i in tqdm(range(0, len(text_list), batch_size)):
@@ -35,14 +36,13 @@ def generate_all_embeddings(text_list, batch_size=8):
             batch_texts,
             padding=True,
             truncation=True,
-            max_length=max_length,
+            max_length=qwen_max_length,
             return_tensors="pt",
-        )
-        batch_dict = {k: v.to(device) for k, v in batch_dict.items()}
+        ).to(device)
 
         with torch.no_grad():
-            outputs = model(**batch_dict)
-            embeddings = last_token_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+            outputs = model(**batch_dict).last_hidden_state
+            embeddings = last_token_pool(outputs, batch_dict['attention_mask'])
 
         embeddings_cpu = embeddings.cpu().numpy()
         all_embeddings.append(embeddings_cpu)
