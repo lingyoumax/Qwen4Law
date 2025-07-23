@@ -14,9 +14,8 @@
             - 直接使用：使用已有的Qwen/Qwen3-Embedding-0.6B对应的Tokenizer
         - Embedding 模型：
             - 重新训练：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
-                - 由于
                 - 损失函数使用Qwen3-Embedding的损失函数。
-            - 微调： 使用Qwen/Qwen3-Embedding-0.6B的架构和权重，使用LoRA和QLoRA分别微调
+            - QLoRA微调： 使用Qwen/Qwen3-Embedding-0.6B的架构和权重，使用QLoRA微调
     - 
 # 结果及分析
 ## Retriever
