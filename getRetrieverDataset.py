@@ -1,9 +1,29 @@
-import requests
+from openai import OpenAI
+import config
 import pandas as pd
 import random
 from tqdm import tqdm
 import re
 from settings import num_negative_docs
+client = OpenAI(
+    api_key=config.api_key,
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
+
+messages = [{"role": "user", "content": "你是谁"}]
+def generate_with_qwen(prompt, model="qwen-plus-2025-07-14"):
+    messages = [{"role": "user", "content": prompt}]
+    completion = client.chat.completions.create(
+        model=model,  # 您可以按需更换为其它深度思考模型
+        messages=messages,
+        extra_body={"enable_thinking": False}
+        # enable_thinking 参数开启思考过程，QwQ 与 DeepSeek-R1 模型总会进行思考，不支持该参数
+        # stream_options={
+        #     "include_usage": True
+        # },
+    )
+
+    return completion.choices[0].message.content
 
 def clean_text(text):
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
@@ -21,20 +41,6 @@ def clean_text(text):
         last_line = last_line[1:-1]
     
     return last_line
-
-def generate_with_ollama(prompt, model="qwen3:32b"):
-    url = "http://localhost:11434/api/generate"
-    
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False
-    }
-
-    response = requests.post(url, json=payload)
-    data = response.json()
-
-    return data["response"]
 
 
 data=[]
@@ -91,7 +97,7 @@ def row2doc(row):
 
 df=pd.read_csv("Laws_Selected.csv")
 
-for i in tqdm(range(df.shape[0])):
+for i in tqdm(range(6701,df.shape[0])):
     row = df.iloc[i]
     postive_doc = row2doc(row)
     for j in range(1):
@@ -102,7 +108,7 @@ for i in tqdm(range(df.shape[0])):
         for k in nums:
             negative_docs.append(row2doc(df.iloc[k]))
         prompt=getPrompt(postive_doc, negative_docs)
-        result = generate_with_ollama(prompt)
+        result = generate_with_qwen(prompt)
         try:
             result=clean_text(result)
             d=[result, postive_doc]
