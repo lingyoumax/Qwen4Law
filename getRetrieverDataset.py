@@ -97,7 +97,7 @@ def row2doc(row):
 
 df=pd.read_csv("Laws_Selected.csv")
 
-for i in tqdm(range(6701,df.shape[0])):
+for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
     postive_doc = row2doc(row)
     for j in range(1):
