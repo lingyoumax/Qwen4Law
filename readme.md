@@ -88,3 +88,5 @@
 - 在检查筛选数据时，发现仍然有部分数据不完整的情况。发现是源文件本身存在问题，排除代码层面上的错误。
 ## 20250724
 - 之前使用ollama部署的qwen3:32b模型去生成retriever训练数据集，但是这样的速度很慢，并且生成的问答对质量不高，为了解决这个问题，改用阿里云百炼的api调用模型完成。
+## 20250725
+- 在使用RetrieverDataset_selfinstruct时，发现里面有些元素值是nan，将positive_doc为nan的行删除，从所有positive_doc中采样替换为nan的negative_doc。由于使用了贪心算法进行采样，positive_doc之间具有较强的不相关性，所以可以被用来替换掉为nan的negative_doc。
