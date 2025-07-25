@@ -8,15 +8,13 @@ from settings import num_negative_docs
 
 max_length=100000
 
-df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
+df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
 
 tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
 
 query_token_len= [len(tokenizer(d["query"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
 
-
-postive_token_len= [len(tokenizer(d["postive_doc"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
-
+postive_token_len= [len(tokenizer(d["positive_doc"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
 
 negative_token_len= [len(tokenizer(d[f"negative_doc{i}"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows() for i in range(num_negative_docs)]
 
