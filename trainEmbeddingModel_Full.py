@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
 
-from settings import num_negative_docs, device, max_length, random_seed
+from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
 
 test_ratio=0.2
 batch_size=2
@@ -15,12 +15,12 @@ lr=2e-5
 n_epoch=100
 temperature = 0.05
 
-df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
+df = pd.read_csv("RetrieverDataset_selfinstruct.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
         "query": row["query"],
-        "positive": row["postive_doc"],
+        "positive": row["positive_doc"],
         "negatives": [row[f"negative_doc{i}"] for i in range(num_negative_docs)]
     }
     return sample
@@ -41,7 +41,7 @@ dataset_split = dataset.train_test_split(test_size = test_ratio, seed = random_s
 train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
-config = AutoConfig.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
+config = AutoConfig.from_pretrained(retriever_modelname)
 model = AutoModel.from_config(config).to(device)
 model.train()
 tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
