@@ -14,13 +14,9 @@ messages = [{"role": "user", "content": "你是谁"}]
 def generate_with_qwen(prompt, model="qwen3-235b-a22b-instruct-2507"):
     messages = [{"role": "user", "content": prompt}]
     completion = client.chat.completions.create(
-        model=model,  # 您可以按需更换为其它深度思考模型
+        model=model,
         messages=messages,
         extra_body={"enable_thinking": False}
-        # enable_thinking 参数开启思考过程，QwQ 与 DeepSeek-R1 模型总会进行思考，不支持该参数
-        # stream_options={
-        #     "include_usage": True
-        # },
     )
 
     return completion.choices[0].message.content
