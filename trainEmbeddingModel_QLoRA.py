@@ -17,8 +17,6 @@ lr=2e-5
 n_epoch=10
 temperature = 0.05
 
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B", padding_side="left")
-
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
     bnb_4bit_use_double_quant=True,
