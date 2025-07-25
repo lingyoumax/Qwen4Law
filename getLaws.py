@@ -5,12 +5,13 @@ import subprocess
 
 url = 'https://flk.npc.gov.cn/api/?'
 
+filename = "laws"
+if not os.path.exists(filename):
+    os.mkdir(filename)
+
 types={"flfg":"法律", "jcfg":"监察法规", "sfjs":"司法解释", "xffl":"宪法", "xzfg":"行政法规","dfxfg":"地方性法规"}
 pages={"flfg":70, "jcfg":1, "sfjs":86, "xffl":1, "xzfg":80,"dfxfg":2492}
 for type in types:
-    filename = type
-    if not os.path.exists(filename):
-        os.mkdir(filename)
     for page in range(1,pages[type]+1):
         headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -47,9 +48,9 @@ for type in types:
                 with open(docx_filename, mode='wb') as f:
                     f.write(content)
     
-                #pdf_filename = filename + '/'  + title + '.pdf'
-                #convert(docx_filename, pdf_filename)
-                #subprocess.call("taskkill /im WINWORD.EXE /f", shell=True)   
+                pdf_filename = filename + '/'  + title + '.pdf'
+                convert(docx_filename, pdf_filename)
+                subprocess.call("taskkill /im WINWORD.EXE /f", shell=True)   
         except Exception as e:
             print(e)
             try:

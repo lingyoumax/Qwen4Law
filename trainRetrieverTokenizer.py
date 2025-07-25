@@ -20,7 +20,7 @@ tokenizer.normalizer = normalizers.NFC()
 
 trainer = trainers.BpeTrainer(
     #vocab_size=tk.vocab_size,
-    vocab_size=20000,
+    vocab_size=10000,
     min_frequency=2,
 )
 

@@ -162,4 +162,4 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
 
     tqdm.write(f"Epoch {epoch}: Avg Loss = {loss:.4f}")
 
-torch.save(model, 'EmbeddingModel_QloRA.pth')
+model.save_pretrained("EmbeddingModel_QLoRA")
