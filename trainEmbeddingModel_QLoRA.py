@@ -23,10 +23,10 @@ model = prepare_model_for_kbit_training(model)
 lora_config = LoraConfig(
     r=16,
     lora_alpha=32,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],  # 修改为适配你模型的模块名（建议print(model)后确认）
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
     lora_dropout=0.1,
     bias="none",
-    task_type=TaskType.FEATURE_EXTRACTION  # 对应嵌入模型任务
+    task_type=TaskType.FEATURE_EXTRACTION
 )
 
 model = get_peft_model(model, lora_config)
