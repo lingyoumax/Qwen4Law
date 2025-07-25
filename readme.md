@@ -9,10 +9,14 @@
             - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
             - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，在权衡了GPU的推理速度和时间之后，将子集的大小设置为10000。
             - 随机选取chunk作为正例样本，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
+        - Retriever Tokenizer
+            - 重训练:将被筛选的出来的法律条文和对应的查询作为训练数据，vocab_size设定为和原模型tokenizer的vocab_size一样（vocab_size越大，输入对应的token的长度越短。并且原模型的Embedding矩阵维度固定，减小vocab_size也不会改变最终的softmax复杂度）。使用的是Byte-Level的BPE算法。前处理和后处理借鉴了原模型的tokenizer配置。
+            - 直接使用：调用已有的Qwen3-Embedding-0.6b对应的分词器
         - Embedding 模型：
-            - 重新训练：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
+            - 架构，统一使用Qwen3-Embedding-0.6B架构
+            - 重新训练：不使用其权重和Embedding矩阵。
                 - 损失函数使用Qwen3-Embedding的损失函数。
-            - QLoRA微调： 使用Qwen/Qwen3-Embedding-0.6B的架构和权重，使用QLoRA微调
+            - QLoRA微调： 使用预训练权重初始化
 
 # 结果及分析
 ## Retriever
@@ -20,7 +24,7 @@
 使用已分好块的语料库做测试，计算每一个chunk对应的Token数量的平均数。
 |     | Pretrained Tokenizer   | Retrained Tokenizer |
 |:---:|:---:|:---:|
-|  # of Mean Token  | 54.17386496216359 | 22.577796558983728 |
+|  # of Mean Token  | 63.668085703592816 | 26.955351371121395 |
 
 可以看出，重新训练的Tokenizer所需的平均Token数量更少，这是因为它是根据该任务特定的语料库作训练的，在针对性上做得更好。
 
@@ -84,3 +88,5 @@
 - 在检查筛选数据时，发现仍然有部分数据不完整的情况。发现是源文件本身存在问题，排除代码层面上的错误。
 ## 20250724
 - 之前使用ollama部署的qwen3:32b模型去生成retriever训练数据集，但是这样的速度很慢，并且生成的问答对质量不高，为了解决这个问题，改用阿里云百炼的api调用模型完成。
+## 20250725
+- 在使用RetrieverDataset_selfinstruct时，发现里面有些元素值是nan，将positive_doc为nan的行删除，从所有positive_doc中采样替换为nan的negative_doc。由于使用了贪心算法进行采样，positive_doc之间具有较强的不相关性，所以可以被用来替换掉为nan的negative_doc。
