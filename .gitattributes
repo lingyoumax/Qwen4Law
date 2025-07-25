@@ -1,6 +1,0 @@
-Laws_All.csv filter=lfs diff=lfs merge=lfs -text
-laws filter=lfs diff=lfs merge=lfs -text
-Laws_Embeddings.npy filter=lfs diff=lfs merge=lfs -text
-laws_Selected.csv filter=lfs diff=lfs merge=lfs -text
-RetrieverDataset_selfinstruct.csv filter=lfs diff=lfs merge=lfs -text
-RetrieverDataset_selfinstruct_cleaned.csv filter=lfs diff=lfs merge=lfs -text
