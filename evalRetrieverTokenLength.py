@@ -19,13 +19,13 @@ postive_token_len= [len(tokenizer(d["positive_doc"], padding=True, truncation=Tr
 negative_token_len= [len(tokenizer(d[f"negative_doc{i}"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows() for i in range(num_negative_docs)]
 
 query_mean = np.mean(query_token_len)
-query_p99 = np.percentile(query_token_len, 95)
+query_p99 = np.percentile(query_token_len, 99)
 
 positive_mean = np.mean(postive_token_len)
-positive_p99 = np.percentile(postive_token_len, 95)
+positive_p99 = np.percentile(postive_token_len, 99)
 
 negative_mean = np.mean(negative_token_len)
-negative_p99 = np.percentile(negative_token_len, 95)
+negative_p99 = np.percentile(negative_token_len, 99)
 
 plt.figure(figsize=(15, 5))
 
