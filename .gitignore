@@ -5,3 +5,6 @@ config.py
 *.pdf
 *.txt
 *.docx
+*.npy
+EmbeddingModel_QLoRA/
+RetrieverTokenizer/
