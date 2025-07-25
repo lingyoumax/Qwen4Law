@@ -15,12 +15,12 @@ lr=2e-5
 n_epoch=100
 temperature = 0.05
 
-df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
+df = pd.read_csv("RetrieverDataset_selfinstruct.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
         "query": row["query"],
-        "positive": row["postive_doc"],
+        "positive": row["positive_doc"],
         "negatives": [row[f"negative_doc{i}"] for i in range(num_negative_docs)]
     }
     return sample
