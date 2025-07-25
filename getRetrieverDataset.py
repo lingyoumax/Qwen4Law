@@ -1,9 +1,29 @@
-import requests
+from openai import OpenAI
+import config
 import pandas as pd
 import random
 from tqdm import tqdm
 import re
 from settings import num_negative_docs
+client = OpenAI(
+    api_key=config.api_key,
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
+
+messages = [{"role": "user", "content": "你是谁"}]
+def generate_with_qwen(prompt, model="qwen-plus-2025-07-14"):
+    messages = [{"role": "user", "content": prompt}]
+    completion = client.chat.completions.create(
+        model=model,  # 您可以按需更换为其它深度思考模型
+        messages=messages,
+        extra_body={"enable_thinking": False}
+        # enable_thinking 参数开启思考过程，QwQ 与 DeepSeek-R1 模型总会进行思考，不支持该参数
+        # stream_options={
+        #     "include_usage": True
+        # },
+    )
+
+    return completion.choices[0].message.content
 
 def clean_text(text):
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
@@ -22,24 +42,10 @@ def clean_text(text):
     
     return last_line
 
-def generate_with_ollama(prompt, model="qwen3:32b"):
-    url = "http://localhost:11434/api/generate"
-    
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False
-    }
-
-    response = requests.post(url, json=payload)
-    data = response.json()
-
-    return data["response"]
-
 
 data=[]
 
-def getPrompt(postive_doc, negative_docs):
+def getPrompt(positive_doc, negative_docs):
     prompt=f"""
 你的任务是根据正例文档生成一个用户查询，该查询应能准确检索到正例文档内容，并避免检索到负例文档。请生成符合人类自然搜索习惯的语义查询。
 
@@ -52,7 +58,7 @@ def getPrompt(postive_doc, negative_docs):
 # 正例文档  
 首先，请仔细阅读以下正例文档：
 <正例文档>
-{postive_doc}
+{positive_doc}
 </正例文档>
 
 # 需避开的负例文档
@@ -93,7 +99,7 @@ df=pd.read_csv("Laws_Selected.csv")
 
 for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
-    postive_doc = row2doc(row)
+    positive_doc = row2doc(row)
     for j in range(1):
         candidate_indices = [x for x in range(df.shape[0]) if x != i]
         nums = random.sample(candidate_indices, num_negative_docs)
@@ -101,11 +107,11 @@ for i in tqdm(range(df.shape[0])):
         negative_docs=[]
         for k in nums:
             negative_docs.append(row2doc(df.iloc[k]))
-        prompt=getPrompt(postive_doc, negative_docs)
-        result = generate_with_ollama(prompt)
+        prompt=getPrompt(positive_doc, negative_docs)
+        result = generate_with_qwen(prompt)
         try:
             result=clean_text(result)
-            d=[result, postive_doc]
+            d=[result, positive_doc]
             d.extend(negative_docs)
             data.append(d)
         except Exception as e:
