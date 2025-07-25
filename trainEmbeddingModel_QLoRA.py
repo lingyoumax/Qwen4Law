@@ -1,7 +1,21 @@
-from modelscope import AutoTokenizer, BitsAndBytesConfig
-from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft_model
-from modelscope import AutoModel
+from modelscope import AutoModel, AutoTokenizer, BitsAndBytesConfig
+from transformers import BatchEncoding
+from datasets import Dataset
 import torch
+import pandas as pd
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft_model
+import torch
+import torch.nn.functional as F
+
+from settings import num_negative_docs, device, max_length, random_seed
+
+test_ratio=0.2
+batch_size=2
+lr=2e-5
+n_epoch=10
+temperature = 0.05
 
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B", padding_side="left")
 
@@ -30,3 +44,124 @@ lora_config = LoraConfig(
 )
 
 model = get_peft_model(model, lora_config)
+
+tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
+
+df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
+
+def row_to_sample(row):
+    sample = {
+        "query": row["query"],
+        "positive": row["postive_doc"],
+        "negatives": [row[f"negative_doc{i}"] for i in range(num_negative_docs)]
+    }
+    return sample
+
+def last_token_pool(last_hidden_states, attention_mask):
+    left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+    if left_padding:
+        return last_hidden_states[:, -1]
+    else:
+        sequence_lengths = attention_mask.sum(dim=1) - 1
+        batch_size = last_hidden_states.shape[0]
+        return last_hidden_states[torch.arange(batch_size, device=device), sequence_lengths]
+
+data = [row_to_sample(row) for _, row in df.iterrows()]
+
+dataset = Dataset.from_list(data)
+dataset_split = dataset.train_test_split(test_size = test_ratio, seed = random_seed)
+train_dataset = dataset_split["train"]
+test_dataset = dataset_split["test"]
+
+def tokenize_function(example):
+    query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+    positive = tokenizer(example["positive"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+    negatives = tokenizer(example["negatives"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+
+    features = {
+        "query_input_ids": query["input_ids"][0],
+        "query_attention_mask": query["attention_mask"][0],
+        "positive_input_ids": positive["input_ids"][0],
+        "positive_attention_mask": positive["attention_mask"][0]
+    }
+
+    for i in range(num_negative_docs):
+        features[f"negative_input_ids_{i}"] = negatives["input_ids"][i]
+        features[f"negative_attention_mask_{i}"] = negatives["attention_mask"][i]
+
+    return features
+
+tokenized_train_dataset = train_dataset.map(tokenize_function, remove_columns=train_dataset.column_names)
+tokenized_test_dataset = test_dataset.map(tokenize_function, remove_columns=test_dataset.column_names)
+
+def collate_fn(batch):
+    batch_dict = {}
+
+    for key in batch[0]:
+        value = torch.stack([torch.tensor(item[key]) for item in batch])
+        batch_dict[key] = value.to(device)
+
+    return batch_dict
+
+train_dataloader = DataLoader(
+    tokenized_train_dataset,
+    batch_size = batch_size,
+    shuffle = True,
+    collate_fn=collate_fn
+)
+test_dataloader = DataLoader(
+    tokenized_test_dataset,
+    batch_size = batch_size,
+    shuffle = True,
+    collate_fn=collate_fn
+)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+
+
+for epoch in tqdm(range(n_epoch), desc="Training"):
+    for batch in train_dataloader:
+        optimizer.zero_grad()
+        query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
+        query_output = model(**query_dict)
+        query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])#batch_size * embedding_length
+        query_embedding = F.normalize(query_embedding, dim=1)
+
+        positive_dict=BatchEncoding({"input_ids":batch["positive_input_ids"],"attention_mask":batch["positive_attention_mask"]})
+        positive_output = model(**positive_dict)
+        positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])#batch_size * embedding_length
+        positive_embedding = F.normalize(positive_embedding, dim=1)
+
+        negative_embeddings=[]
+        for i in range(num_negative_docs):
+            negative_dict_i=BatchEncoding({"input_ids":batch[f"negative_input_ids_{i}"],"attention_mask":batch[f"negative_attention_mask_{i}"]})
+            negative_output_i = model(**negative_dict_i)
+            negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])#batch_size * embedding_length
+            negative_embedding_i = F.normalize(negative_embedding_i, dim=1)
+            negative_embeddings.append(negative_embedding_i)
+        
+        B = query_embedding.size(0)
+
+        negatives_stacked = torch.stack(negative_embeddings)
+
+        sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature
+        sim_q_neg=torch.sum(query_embedding.unsqueeze(0) * negatives_stacked, dim=2).T / temperature
+        sim_q_q=query_embedding @ query_embedding.T / temperature
+        sim_pos_dj = positive_embedding @ positive_embedding.T / temperature
+        sim_q_dj = query_embedding @ positive_embedding.T /temperature
+
+        m = torch.ones_like(sim_q_q, dtype=torch.bool, device=device)
+        diag_indices = torch.arange(sim_q_q.size(0), device=device)
+        m[diag_indices, diag_indices] = False
+        thresholds = sim_q_pos.unsqueeze(1).expand(-1, B) + 0.1
+        too_similar = sim_q_q > thresholds
+        m = m & (~too_similar)
+
+        Z = torch.exp(sim_q_pos) + torch.sum(torch.exp(sim_q_neg), dim=1) + torch.sum(m * torch.exp(sim_q_q), dim=1) + torch.sum(m * torch.exp(sim_pos_dj), dim=1)+ torch.sum(m * torch.exp(sim_q_dj), dim=1)
+        loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Z))
+        loss.backward()
+        optimizer.step()
+
+    tqdm.write(f"Epoch {epoch}: Avg Loss = {loss:.4f}")
+
+torch.save(model, 'EmbeddingModel_QloRA.pth')
