@@ -11,7 +11,7 @@ client = OpenAI(
 )
 
 messages = [{"role": "user", "content": "你是谁"}]
-def generate_with_qwen(prompt, model="qwen-plus-2025-07-14"):
+def generate_with_qwen(prompt, model="qwen3-235b-a22b-instruct-2507"):
     messages = [{"role": "user", "content": prompt}]
     completion = client.chat.completions.create(
         model=model,  # 您可以按需更换为其它深度思考模型
