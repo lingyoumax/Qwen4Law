@@ -26,7 +26,6 @@ directory='laws'
 fileend='.txt'
 
 tokenizer.train(files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]+["RetrieverQuery.txt"], trainer=trainer)
-#tokenizer.add_special_tokens(tk.all_special_tokens)
 tokenizer.model.save(save_dir)
 
 hf_tokenizer = PreTrainedTokenizerFast(
