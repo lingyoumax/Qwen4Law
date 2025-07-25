@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
 
-from settings import num_negative_docs, device, max_length, random_seed
+from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
 
 test_ratio=0.2
 batch_size=2
@@ -41,7 +41,7 @@ dataset_split = dataset.train_test_split(test_size = test_ratio, seed = random_s
 train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
-config = AutoConfig.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
+config = AutoConfig.from_pretrained(retriever_modelname)
 model = AutoModel.from_config(config).to(device)
 model.train()
 tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')

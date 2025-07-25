@@ -1,16 +1,16 @@
 import torch
 from torch import Tensor
-import torch.nn.functional as F
 from modelscope import AutoTokenizer, AutoModel
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from settings import device
+from settings import device, retriever_modelname
+
 qwen_max_length=8192
 
-tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-Embedding-0.6B', padding_side='left')
-model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B')
+tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
+model = AutoModel.from_pretrained(retriever_modelname)
 
 model = model.to(device)
 model.eval()

@@ -2,8 +2,10 @@ from tokenizers import Tokenizer, models, trainers, pre_tokenizers, decoders, no
 from modelscope import PreTrainedTokenizerFast, AutoTokenizer
 
 from tools import getFiles
+from settings import retriever_modelname
+
 save_dir = "RetrieverTokenizer"
-tk = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
+tk = AutoTokenizer.from_pretrained(retriever_modelname)
 tokenizer = Tokenizer(models.BPE(continuing_subword_prefix="",end_of_word_suffix=""))
 split_pre_tokenizer = pre_tokenizers.Split(
     pattern=r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+",

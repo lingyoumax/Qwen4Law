@@ -2,9 +2,11 @@ from modelscope import AutoTokenizer
 from tools import getFiles
 from tqdm import tqdm
 
-qwen_tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B", padding_side='left')
+from settings import retriever_modelname
 
-my_tokenizer = AutoTokenizer.from_pretrained("Tokenizer", padding_side='left')
+qwen_tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
+
+my_tokenizer = AutoTokenizer.from_pretrained("RetrieverTokenizer", padding_side='left')
 
 directory='laws'
 fileend='.txt'

@@ -5,13 +5,14 @@ import os
 from tqdm import tqdm
 
 from tools import getFiles
+from settings import retriever_modelname
 
 directory='laws'
 fileend='.txt'
 
 files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]+["RetrieverQuery.txt"]
 
-tk = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B")
+tk = AutoTokenizer.from_pretrained(retriever_modelname)
 special_tokens = tk.all_special_tokens
 
 x = []

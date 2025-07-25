@@ -9,7 +9,7 @@ from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft
 import torch
 import torch.nn.functional as F
 
-from settings import num_negative_docs, device, max_length, random_seed
+from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
 
 test_ratio=0.2
 batch_size=2
@@ -25,7 +25,7 @@ bnb_config = BitsAndBytesConfig(
 )
 
 model = AutoModel.from_pretrained(
-    "Qwen/Qwen3-Embedding-0.6B",
+    retriever_modelname,
     quantization_config=bnb_config,
     device_map="auto"
 )
@@ -43,7 +43,7 @@ lora_config = LoraConfig(
 
 model = get_peft_model(model, lora_config)
 
-tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
+tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
 
 df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
 
