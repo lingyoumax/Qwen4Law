@@ -45,7 +45,7 @@ def clean_text(text):
 
 data=[]
 
-def getPrompt(postive_doc, negative_docs):
+def getPrompt(positive_doc, negative_docs):
     prompt=f"""
 你的任务是根据正例文档生成一个用户查询，该查询应能准确检索到正例文档内容，并避免检索到负例文档。请生成符合人类自然搜索习惯的语义查询。
 
@@ -58,7 +58,7 @@ def getPrompt(postive_doc, negative_docs):
 # 正例文档  
 首先，请仔细阅读以下正例文档：
 <正例文档>
-{postive_doc}
+{positive_doc}
 </正例文档>
 
 # 需避开的负例文档
@@ -99,7 +99,7 @@ df=pd.read_csv("Laws_Selected.csv")
 
 for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
-    postive_doc = row2doc(row)
+    positive_doc = row2doc(row)
     for j in range(1):
         candidate_indices = [x for x in range(df.shape[0]) if x != i]
         nums = random.sample(candidate_indices, num_negative_docs)
@@ -107,11 +107,11 @@ for i in tqdm(range(df.shape[0])):
         negative_docs=[]
         for k in nums:
             negative_docs.append(row2doc(df.iloc[k]))
-        prompt=getPrompt(postive_doc, negative_docs)
+        prompt=getPrompt(positive_doc, negative_docs)
         result = generate_with_qwen(prompt)
         try:
             result=clean_text(result)
-            d=[result, postive_doc]
+            d=[result, positive_doc]
             d.extend(negative_docs)
             data.append(d)
         except Exception as e:
