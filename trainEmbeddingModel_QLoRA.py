@@ -1,9 +1,21 @@
-from modelscope import AutoTokenizer, BitsAndBytesConfig
-from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft_model
-from modelscope import AutoModel
+from modelscope import AutoModel, AutoTokenizer, BitsAndBytesConfig
+from transformers import BatchEncoding
+from datasets import Dataset
 import torch
+import pandas as pd
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft_model
+import torch
+import torch.nn.functional as F
 
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-0.6B", padding_side="left")
+from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
+
+test_ratio=0.2
+batch_size=2
+lr=2e-5
+n_epoch=10
+temperature = 0.05
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -13,7 +25,7 @@ bnb_config = BitsAndBytesConfig(
 )
 
 model = AutoModel.from_pretrained(
-    "Qwen/Qwen3-Embedding-0.6B",
+    retriever_modelname,
     quantization_config=bnb_config,
     device_map="auto"
 )
@@ -30,3 +42,5 @@ lora_config = LoraConfig(
 )
 
 model = get_peft_model(model, lora_config)
+
+model.save_pretrained("EmbeddingModel_QLoRA")
