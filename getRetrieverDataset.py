@@ -122,9 +122,3 @@ columns.extend([f"negative_doc{i}" for i in range(num_negative_docs)])
 
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
 RetrieverData_selfinstruct.to_csv("RetrieverDataset_selfinstruct.csv", index=False, encoding="utf-8-sig")
-
-query = RetrieverData_selfinstruct['query'].tolist()
-
-with open('RetrieverQuery.txt', 'w', encoding='utf-8') as f:
-    for item in query:
-        f.write(f"{item}\n")

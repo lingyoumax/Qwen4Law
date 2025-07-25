@@ -8,26 +8,24 @@ from settings import num_negative_docs
 
 max_length=100000
 
-df = pd.read_csv("RetrieverDataset_selfinstruct.csv")
+df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
 
 tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
 
 query_token_len= [len(tokenizer(d["query"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
 
-
-postive_token_len= [len(tokenizer(d["postive_doc"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
-
+postive_token_len= [len(tokenizer(d["positive_doc"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
 
 negative_token_len= [len(tokenizer(d[f"negative_doc{i}"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows() for i in range(num_negative_docs)]
 
 query_mean = np.mean(query_token_len)
-query_p99 = np.percentile(query_token_len, 99)
+query_p99 = np.percentile(query_token_len, 95)
 
 positive_mean = np.mean(postive_token_len)
-positive_p99 = np.percentile(postive_token_len, 99)
+positive_p99 = np.percentile(postive_token_len, 95)
 
 negative_mean = np.mean(negative_token_len)
-negative_p99 = np.percentile(negative_token_len, 99)
+negative_p99 = np.percentile(negative_token_len, 95)
 
 plt.figure(figsize=(15, 5))
 

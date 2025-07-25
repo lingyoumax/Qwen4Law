@@ -19,8 +19,8 @@ tokenizer.decoder=decoders.ByteLevel(add_prefix_space=False, trim_offsets=False,
 tokenizer.normalizer = normalizers.NFC()
 
 trainer = trainers.BpeTrainer(
-    #vocab_size=tk.vocab_size,
-    vocab_size=10000,
+    vocab_size=tk.vocab_size,
+    #vocab_size=10000,
     min_frequency=2,
 )
 
