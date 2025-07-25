@@ -1,0 +1,37 @@
+from modelscope import AutoTokenizer
+from tools import getFiles
+from tqdm import tqdm
+
+from settings import retriever_modelname
+
+qwen_tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
+
+my_tokenizer = AutoTokenizer.from_pretrained("RetrieverTokenizer", padding_side='left')
+
+directory='laws'
+fileend='.txt'
+files = [f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]+["RetrieverQuery.txt"]
+
+total_tokens_qwen = 0
+total_tokens_mine = 0
+count = 0
+
+for file in tqdm(files):
+    with open(file, "r", encoding="utf-8") as f:
+        text = f.read()
+        lines = text.split("\n")
+        for line in lines:
+            if line.strip():
+                encoded_qwen = qwen_tokenizer.encode(line, add_special_tokens=True)
+                total_tokens_qwen += len(encoded_qwen)
+
+                encoded_mine = my_tokenizer.encode(line, add_special_tokens=True)
+                total_tokens_mine += len(encoded_mine)
+
+                count += 1
+
+avg_tokens_qwen = total_tokens_qwen / count if count > 0 else 0
+avg_tokens_mine = total_tokens_mine / count if count > 0 else 0
+
+print("The average number of tokens of pretrained tokenizer:", avg_tokens_qwen)
+print("The average number of tokens of my tokenizer:", avg_tokens_mine)
