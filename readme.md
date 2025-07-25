@@ -9,14 +9,11 @@
             - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
             - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，在权衡了GPU的推理速度和时间之后，将子集的大小设置为10000。
             - 随机选取chunk作为正例样本，通过ollama部署的Qwen3:32b模型并使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
-        - Tokenizer：
-            - 重新训练：使用BPE切词。为了对齐Qwen3-Embedding-0.6B架构使用的Embedding Lookup，将vocab_size设置为了151669。但是重新训练的Tokenizer只能给重新训练的Embedding模型和Rerank模型用
-            - 直接使用：使用已有的Qwen/Qwen3-Embedding-0.6B对应的Tokenizer
         - Embedding 模型：
             - 重新训练：使用Qwen3-Embedding-0.6B架构，但不使用其权重和Embedding矩阵。
                 - 损失函数使用Qwen3-Embedding的损失函数。
             - QLoRA微调： 使用Qwen/Qwen3-Embedding-0.6B的架构和权重，使用QLoRA微调
-    - 
+
 # 结果及分析
 ## Retriever
 ### Tokenizer
