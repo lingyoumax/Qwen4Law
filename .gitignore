@@ -1,4 +1,10 @@
 test.py
 __pycache__/
 config.py
-ignoreFiles/
+*.csv
+*.pdf
+*.txt
+*.docx
+*.npy
+EmbeddingModel_QLoRA/
+RetrieverTokenizer/
