@@ -15,7 +15,7 @@ lr=2e-5
 n_epoch=100
 temperature = 0.05
 
-df = pd.read_csv("RetrieverDataset_selfinstruct.csv", encoding="utf-8-sig")
+df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
