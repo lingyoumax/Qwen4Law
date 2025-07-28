@@ -1,22 +1,23 @@
 # 项目目的
 本项目计划基于Qwen3搭建一个法律知识信息问答系统。
 # 技术路线
-- RNG：
-    - Retriever：
-        - 数据集：
-            - 范围：包含中国生效的宪法、法律法规、行政法规、监察法规、司法解释、地方性法规共计9575篇
-            - 来源：[国家法律法规数据库](https://flk.npc.gov.cn/index.html)
-            - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
-            - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，在权衡了GPU的推理速度和时间之后，将子集的大小设置为10000。
-            - 随机选取chunk作为正例样本，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
-        - Retriever Tokenizer
-            - 重训练:将被筛选的出来的法律条文和对应的查询作为训练数据，vocab_size设定为和原模型tokenizer的vocab_size一样（vocab_size越大，输入对应的token的长度越短。并且原模型的Embedding矩阵维度固定，减小vocab_size也不会改变最终的softmax复杂度）。使用的是Byte-Level的BPE算法。前处理和后处理借鉴了原模型的tokenizer配置。
-            - 直接使用：调用已有的Qwen3-Embedding-0.6b对应的分词器
-        - Embedding 模型：
-            - 架构，统一使用Qwen3-Embedding-0.6B架构
-            - 重新训练：不使用其权重和Embedding矩阵。
-                - 损失函数使用Qwen3-Embedding的损失函数。
-            - QLoRA微调： 使用预训练权重初始化
+## Retriever
+### 数据集
+- 范围：包含中国生效的宪法、法律法规、行政法规、监察法规、司法解释、地方性法规共计9575篇
+- 来源：[国家法律法规数据库](https://flk.npc.gov.cn/index.html)
+- 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
+- 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，在权衡了GPU的推理速度和时间之后，将子集的大小设置为10000。
+- 数据生成：随机选取chunk作为正例样本，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
+### Tokenizer
+为了配合Embedding的重训练和微调任务，tokenizer的使用方式分为以下两个分支
+- 重训练:将被筛选的出来的法律条文和对应的查询作为训练数据，vocab_size设定为和原模型tokenizer的vocab_size一样（vocab_size越大，输入对应的token的长度越短。并且原模型的Embedding矩阵维度固定，减小vocab_size也不会改变最终的softmax复杂度）。使用的是Byte-Level的BPE算法。前处理和后处理借鉴了原模型的tokenizer配置。
+- 直接使用：调用已有的Qwen3-Embedding-0.6b对应的分词器
+### Embedding 模型
+统一使用Qwen3-Embedding-0.6B架构，分别采取以下技术路线进行对比实验：
+- 重新训练
+- 全量微调
+- QLoRA微调
+- Prefix微调
 
 # 结果及分析
 ## Retriever
