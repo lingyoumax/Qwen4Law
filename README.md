@@ -92,7 +92,7 @@
 ## 20250725
 - 在使用RetrieverDataset_selfinstruct时，发现里面有些元素值是nan，将positive_doc为nan的行删除，从所有positive_doc中采样替换为nan的negative_doc。由于使用了贪心算法进行采样，positive_doc之间具有较强的不相关性，所以可以被用来替换掉为nan的negative_doc。
 
-# 引用
+# 参考文献
 [^1]:```bibtex
     @article{qwen3embedding,
         title={Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
