@@ -11,9 +11,9 @@
 ### Tokenizer
 为了配合Embedding的重训练和微调任务，tokenizer的使用方式分为以下两个分支
 - 重训练:将被筛选的出来的法律条文和对应的查询作为训练数据，vocab_size设定为和原模型tokenizer的vocab_size一样（vocab_size越大，输入对应的token的长度越短。并且原模型的Embedding矩阵维度固定，减小vocab_size也不会改变最终的softmax复杂度）。使用的是Byte-Level的BPE算法。前处理和后处理借鉴了原模型的tokenizer配置。
-- 直接使用：调用已有的Qwen3-Embedding-0.6b对应的分词器
+- 直接使用：调用预训练模型对应的分词器
 ### Embedding 模型
-统一使用Qwen3-Embedding-0.6B架构，分别采取以下技术路线进行对比实验：
+统一使用Qwen3-Embedding-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
 - 重新训练
 - 全量微调
 - QLoRA微调
@@ -91,3 +91,13 @@
 - 之前使用ollama部署的qwen3:32b模型去生成retriever训练数据集，但是这样的速度很慢，并且生成的问答对质量不高，为了解决这个问题，改用阿里云百炼的api调用模型完成。
 ## 20250725
 - 在使用RetrieverDataset_selfinstruct时，发现里面有些元素值是nan，将positive_doc为nan的行删除，从所有positive_doc中采样替换为nan的negative_doc。由于使用了贪心算法进行采样，positive_doc之间具有较强的不相关性，所以可以被用来替换掉为nan的negative_doc。
+
+# 引用
+[^1]:```bibtex
+@article{qwen3embedding,
+  title={Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
+  author={Zhang, Yanzhao and Li, Mingxin and Long, Dingkun and Zhang, Xin and Lin, Huan and Yang, Baosong and Xie, Pengjun and Yang, An and Liu, Dayiheng and Lin, Junyang and Huang, Fei and Zhou, Jingren},
+  journal={arXiv preprint arXiv:2506.05176},
+  year={2025}
+}
+```
