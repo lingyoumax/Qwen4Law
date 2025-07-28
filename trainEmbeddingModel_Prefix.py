@@ -1,4 +1,4 @@
-from modelscope import AutoModel, AutoTokenizer, BitsAndBytesConfig
+from modelscope import AutoModel, AutoTokenizer
 from transformers import BatchEncoding
 from datasets import Dataset
 import torch
