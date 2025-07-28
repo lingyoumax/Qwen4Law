@@ -6,6 +6,9 @@ config.py
 *.txt
 *.docx
 *.npy
+EmbeddingModel_Retrain/
 EmbeddingModel_QLoRA/
+EmbeddingModel_Full/
+EmbeddingModel_Prefix/
 RetrieverTokenizer/
 laws/

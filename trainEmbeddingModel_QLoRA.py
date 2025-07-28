@@ -12,10 +12,36 @@ import torch.nn.functional as F
 from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
 
 test_ratio=0.2
-batch_size=2
+batch_size=32
 lr=2e-5
 n_epoch=10
 temperature = 0.05
+
+df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
+
+def row_to_sample(row):
+    sample = {
+        "query": row["query"],
+        "positive": row["positive_doc"],
+        "negatives": [row[f"negative_doc{i}"] for i in range(num_negative_docs)]
+    }
+    return sample
+
+def last_token_pool(last_hidden_states, attention_mask):
+    left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+    if left_padding:
+        return last_hidden_states[:, -1]
+    else:
+        sequence_lengths = attention_mask.sum(dim=1) - 1
+        batch_size = last_hidden_states.shape[0]
+        return last_hidden_states[torch.arange(batch_size, device=device), sequence_lengths]
+
+data = [row_to_sample(row) for _, row in df.iterrows()]
+
+dataset = Dataset.from_list(data)
+dataset_split = dataset.train_test_split(test_size = test_ratio, seed = random_seed)
+train_dataset = dataset_split["train"]
+test_dataset = dataset_split["test"]
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -41,6 +67,144 @@ lora_config = LoraConfig(
     task_type=TaskType.FEATURE_EXTRACTION
 )
 
-model = get_peft_model(model, lora_config)
+model = get_peft_model(model, lora_config).to(device)
+model.train()
+tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
 
-model.save_pretrained("EmbeddingModel_QLoRA")
+def tokenize_function(example):
+    query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+    positive = tokenizer(example["positive"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+    negatives = tokenizer(example["negatives"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+
+    features = {
+        "query_input_ids": query["input_ids"][0],
+        "query_attention_mask": query["attention_mask"][0],
+        "positive_input_ids": positive["input_ids"][0],
+        "positive_attention_mask": positive["attention_mask"][0]
+    }
+
+    for i in range(num_negative_docs):
+        features[f"negative_input_ids_{i}"] = negatives["input_ids"][i]
+        features[f"negative_attention_mask_{i}"] = negatives["attention_mask"][i]
+
+    return features
+
+tokenized_train_dataset = train_dataset.map(tokenize_function, remove_columns=train_dataset.column_names)
+tokenized_test_dataset = test_dataset.map(tokenize_function, remove_columns=test_dataset.column_names)
+
+def collate_fn(batch):
+    batch_dict = {}
+
+    for key in batch[0]:
+        value = torch.stack([torch.tensor(item[key]) for item in batch])
+        batch_dict[key] = value.to(device)
+
+    return batch_dict
+
+train_dataloader = DataLoader(
+    tokenized_train_dataset,
+    batch_size = batch_size,
+    shuffle = True,
+    collate_fn=collate_fn
+)
+test_dataloader = DataLoader(
+    tokenized_test_dataset,
+    batch_size = batch_size,
+    shuffle = True,
+    collate_fn=collate_fn
+)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+
+best_recall = 0.0  # 用于追踪最佳 Recall@1
+
+def evaluate(model, dataloader):
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch in dataloader:
+            query_dict = BatchEncoding({"input_ids": batch["query_input_ids"], "attention_mask": batch["query_attention_mask"]})
+            query_output = model(**query_dict)
+            query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])
+            query_embedding = F.normalize(query_embedding, dim=1)
+
+            positive_dict = BatchEncoding({"input_ids": batch["positive_input_ids"], "attention_mask": batch["positive_attention_mask"]})
+            positive_output = model(**positive_dict)
+            positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])
+            positive_embedding = F.normalize(positive_embedding, dim=1)
+
+            negative_embeddings = []
+            for i in range(num_negative_docs):
+                neg_dict = BatchEncoding({
+                    "input_ids": batch[f"negative_input_ids_{i}"],
+                    "attention_mask": batch[f"negative_attention_mask_{i}"]
+                })
+                neg_output = model(**neg_dict)
+                neg_embedding = last_token_pool(neg_output.last_hidden_state, batch[f"negative_attention_mask_{i}"])
+                neg_embedding = F.normalize(neg_embedding, dim=1)
+                negative_embeddings.append(neg_embedding)
+
+            # 将正负例拼接在一起，计算相似度
+            candidates = torch.stack([positive_embedding] + negative_embeddings, dim=1)  # [B, 1+K, D]
+            query_embedding = query_embedding.unsqueeze(1)  # [B, 1, D]
+            sims = torch.sum(query_embedding * candidates, dim=2)  # [B, 1+K]
+
+            # 预测最相似的是哪一个文档（0 表示 positive）
+            preds = sims.argmax(dim=1)
+            correct += (preds == 0).sum().item()
+            total += sims.size(0)
+
+    model.train()
+    return correct / total if total > 0 else 0
+
+for epoch in tqdm(range(n_epoch), desc="Training"):
+    for batch in train_dataloader:
+        optimizer.zero_grad()
+        query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
+        query_output = model(**query_dict)
+        query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])#batch_size * embedding_length
+        query_embedding = F.normalize(query_embedding, dim=1)
+
+        positive_dict=BatchEncoding({"input_ids":batch["positive_input_ids"],"attention_mask":batch["positive_attention_mask"]})
+        positive_output = model(**positive_dict)
+        positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])#batch_size * embedding_length
+        positive_embedding = F.normalize(positive_embedding, dim=1)
+
+        negative_embeddings=[]
+        for i in range(num_negative_docs):
+            negative_dict_i=BatchEncoding({"input_ids":batch[f"negative_input_ids_{i}"],"attention_mask":batch[f"negative_attention_mask_{i}"]})
+            negative_output_i = model(**negative_dict_i)
+            negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])#batch_size * embedding_length
+            negative_embedding_i = F.normalize(negative_embedding_i, dim=1)
+            negative_embeddings.append(negative_embedding_i)
+        
+        B = query_embedding.size(0)
+
+        negatives_stacked = torch.stack(negative_embeddings)
+
+        sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature
+        sim_q_neg=torch.sum(query_embedding.unsqueeze(0) * negatives_stacked, dim=2).T / temperature
+        sim_q_q=query_embedding @ query_embedding.T / temperature
+        sim_pos_dj = positive_embedding @ positive_embedding.T / temperature
+        sim_q_dj = query_embedding @ positive_embedding.T /temperature
+
+        m = torch.ones_like(sim_q_q, dtype=torch.bool, device=device)
+        diag_indices = torch.arange(sim_q_q.size(0), device=device)
+        m[diag_indices, diag_indices] = False
+        thresholds = sim_q_pos.unsqueeze(1).expand(-1, B) + 0.1
+        too_similar = sim_q_q > thresholds
+        m = m & (~too_similar)
+
+        Z = torch.exp(sim_q_pos) + torch.sum(torch.exp(sim_q_neg), dim=1) + torch.sum(m * torch.exp(sim_q_q), dim=1) + torch.sum(m * torch.exp(sim_pos_dj), dim=1)+ torch.sum(m * torch.exp(sim_q_dj), dim=1)
+        loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Z))
+        loss.backward()
+        optimizer.step()
+
+    # === Evaluate ===
+    recall = evaluate(model, test_dataloader)
+    tqdm.write(f"Epoch {epoch}: : Avg Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
+
+    if recall > best_recall:
+        best_recall = recall
+        model.save_pretrained("EmbeddingModel_QLoRA")

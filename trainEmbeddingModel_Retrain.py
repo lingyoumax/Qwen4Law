@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
+import os
 
 from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
 
@@ -14,6 +15,9 @@ batch_size=2
 lr=2e-5
 n_epoch=100
 temperature = 0.05
+
+if not os.path.exists("EmbeddingModel_Retrain"):
+    os.mkdir("EmbeddingModel_Retrain")
 
 df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
 
@@ -91,6 +95,47 @@ test_dataloader = DataLoader(
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
+best_recall = 0.0  # 用于追踪最佳 Recall@1
+
+def evaluate(model, dataloader):
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch in dataloader:
+            query_dict = BatchEncoding({"input_ids": batch["query_input_ids"], "attention_mask": batch["query_attention_mask"]})
+            query_output = model(**query_dict)
+            query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])
+            query_embedding = F.normalize(query_embedding, dim=1)
+
+            positive_dict = BatchEncoding({"input_ids": batch["positive_input_ids"], "attention_mask": batch["positive_attention_mask"]})
+            positive_output = model(**positive_dict)
+            positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])
+            positive_embedding = F.normalize(positive_embedding, dim=1)
+
+            negative_embeddings = []
+            for i in range(num_negative_docs):
+                neg_dict = BatchEncoding({
+                    "input_ids": batch[f"negative_input_ids_{i}"],
+                    "attention_mask": batch[f"negative_attention_mask_{i}"]
+                })
+                neg_output = model(**neg_dict)
+                neg_embedding = last_token_pool(neg_output.last_hidden_state, batch[f"negative_attention_mask_{i}"])
+                neg_embedding = F.normalize(neg_embedding, dim=1)
+                negative_embeddings.append(neg_embedding)
+
+            # 将正负例拼接在一起，计算相似度
+            candidates = torch.stack([positive_embedding] + negative_embeddings, dim=1)  # [B, 1+K, D]
+            query_embedding = query_embedding.unsqueeze(1)  # [B, 1, D]
+            sims = torch.sum(query_embedding * candidates, dim=2)  # [B, 1+K]
+
+            # 预测最相似的是哪一个文档（0 表示 positive）
+            preds = sims.argmax(dim=1)
+            correct += (preds == 0).sum().item()
+            total += sims.size(0)
+
+    model.train()
+    return correct / total if total > 0 else 0
 
 for epoch in tqdm(range(n_epoch), desc="Training"):
     for batch in train_dataloader:
@@ -135,6 +180,12 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         loss.backward()
         optimizer.step()
 
-    tqdm.write(f"Epoch {epoch}: Avg Loss = {loss:.4f}")
+    # === Evaluate ===
+    recall = evaluate(model, test_dataloader)
+    tqdm.write(f"Epoch {epoch}: : Avg Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
 
-torch.save(model, 'EmbeddingModel_Retrain.pth')
+    if recall > best_recall:
+        best_recall = recall
+        torch.save(model.state_dict(), 'EmbeddingModel_Retrain/EmbeddingModel_Retrain.pth')
+
+torch.save(model, 'EmbeddingModel_Retrain/EmbeddingModel_Retrain_Finall.pth')
