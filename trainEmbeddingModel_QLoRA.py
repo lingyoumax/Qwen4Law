@@ -56,7 +56,7 @@ model = AutoModel.from_pretrained(
     device_map="auto"
 )
 
-model = prepare_model_for_kbit_training(model)
+model = prepare_model_for_kbit_training(model,gradient_checkpointing_kwargs={"use_reentrant":False})
 
 lora_config = LoraConfig(
     r=16,
@@ -68,6 +68,7 @@ lora_config = LoraConfig(
 )
 
 model = get_peft_model(model, lora_config).to(device)
+
 model.train()
 tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
 
@@ -203,7 +204,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
 
     # === Evaluate ===
     recall = evaluate(model, test_dataloader)
-    tqdm.write(f"Epoch {epoch}: : Avg Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
+    tqdm.write(f"Epoch {epoch}: Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
 
     if recall > best_recall:
         best_recall = recall
