@@ -4,11 +4,12 @@ from modelscope import AutoConfig, AutoModel, AutoTokenizer
 from transformers import BatchEncoding
 import torch
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import torch.nn.functional as F
 import os
 
 from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
+from tools import last_token_pool, evaluateEmbeddingModel
 
 test_ratio=0.2
 batch_size=2
@@ -28,15 +29,6 @@ def row_to_sample(row):
         "negatives": [row[f"negative_doc{i}"] for i in range(num_negative_docs)]
     }
     return sample
-
-def last_token_pool(last_hidden_states, attention_mask):
-    left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
-    if left_padding:
-        return last_hidden_states[:, -1]
-    else:
-        sequence_lengths = attention_mask.sum(dim=1) - 1
-        batch_size = last_hidden_states.shape[0]
-        return last_hidden_states[torch.arange(batch_size, device=device), sequence_lengths]
 
 data = [row_to_sample(row) for _, row in df.iterrows()]
 
@@ -100,46 +92,6 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
 best_recall = 0.0  # 用于追踪最佳 Recall@1
 
-def evaluate(model, dataloader):
-    model.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for batch in dataloader:
-            query_dict = BatchEncoding({"input_ids": batch["query_input_ids"], "attention_mask": batch["query_attention_mask"]})
-            query_output = model(**query_dict)
-            query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])
-            query_embedding = F.normalize(query_embedding, dim=1)
-
-            positive_dict = BatchEncoding({"input_ids": batch["positive_input_ids"], "attention_mask": batch["positive_attention_mask"]})
-            positive_output = model(**positive_dict)
-            positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])
-            positive_embedding = F.normalize(positive_embedding, dim=1)
-
-            negative_embeddings = []
-            for i in range(num_negative_docs):
-                neg_dict = BatchEncoding({
-                    "input_ids": batch[f"negative_input_ids_{i}"],
-                    "attention_mask": batch[f"negative_attention_mask_{i}"]
-                })
-                neg_output = model(**neg_dict)
-                neg_embedding = last_token_pool(neg_output.last_hidden_state, batch[f"negative_attention_mask_{i}"])
-                neg_embedding = F.normalize(neg_embedding, dim=1)
-                negative_embeddings.append(neg_embedding)
-
-            # 将正负例拼接在一起，计算相似度
-            candidates = torch.stack([positive_embedding] + negative_embeddings, dim=1)  # [B, 1+K, D]
-            query_embedding = query_embedding.unsqueeze(1)  # [B, 1, D]
-            sims = torch.sum(query_embedding * candidates, dim=2)  # [B, 1+K]
-
-            # 预测最相似的是哪一个文档（0 表示 positive）
-            preds = sims.argmax(dim=1)
-            correct += (preds == 0).sum().item()
-            total += sims.size(0)
-
-    model.train()
-    return correct / total if total > 0 else 0
-
 for epoch in tqdm(range(n_epoch), desc="Training"):
     for batch in train_dataloader:
         optimizer.zero_grad()
@@ -184,7 +136,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         optimizer.step()
 
     # === Evaluate ===
-    recall = evaluate(model, test_dataloader)
+    recall = evaluateEmbeddingModel(model, test_dataloader)
     tqdm.write(f"Epoch {epoch}: : Avg Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
 
     if recall > best_recall:
