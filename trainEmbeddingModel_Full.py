@@ -8,11 +8,9 @@ from tqdm.auto import tqdm
 import torch.nn.functional as F
 import os
 
-from settings import num_negative_docs, device, max_length, random_seed, retriever_modelname
+from settings import num_negative_docs, device, embedding_max_length, random_seed, retriever_modelname, embedding_test_ratio, embedding_batch_size
 from tools import last_token_pool, evaluateEmbeddingModel
 
-test_ratio=0.2
-batch_size=2
 lr=2e-5
 n_epoch=10
 temperature = 0.05
@@ -33,7 +31,7 @@ def row_to_sample(row):
 data = [row_to_sample(row) for _, row in df.iterrows()]
 
 dataset = Dataset.from_list(data)
-dataset_split = dataset.train_test_split(test_size = test_ratio, seed = random_seed)
+dataset_split = dataset.train_test_split(test_size = embedding_test_ratio, seed = random_seed)
 train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
@@ -46,9 +44,9 @@ model.train()
 tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
 
 def tokenize_function(example):
-    query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
-    positive = tokenizer(example["positive"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
-    negatives = tokenizer(example["negatives"], padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+    query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
+    positive = tokenizer(example["positive"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
+    negatives = tokenizer(example["negatives"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
 
     features = {
         "query_input_ids": query["input_ids"][0],
@@ -77,13 +75,13 @@ def collate_fn(batch):
 
 train_dataloader = DataLoader(
     tokenized_train_dataset,
-    batch_size = batch_size,
+    batch_size = embedding_batch_size,
     shuffle = True,
     collate_fn=collate_fn
 )
 test_dataloader = DataLoader(
     tokenized_test_dataset,
-    batch_size = batch_size,
+    batch_size = embedding_batch_size,
     shuffle = True,
     collate_fn=collate_fn
 )
