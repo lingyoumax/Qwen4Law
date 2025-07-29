@@ -10,7 +10,6 @@ client = OpenAI(
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 
-messages = [{"role": "user", "content": "你是谁"}]
 def generate_with_qwen(prompt, model="qwen3-235b-a22b-instruct-2507"):
     messages = [{"role": "user", "content": prompt}]
     completion = client.chat.completions.create(
