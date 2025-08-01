@@ -145,7 +145,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
 
     # === Evaluate ===
     recall = evaluateEmbeddingModel(model, test_dataloader)
-    tqdm.write(f"Epoch {epoch}: : Avg Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
+    tqdm.write(f"Epoch {epoch}: Avg Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
 
     if recall > best_recall:
         best_recall = recall
