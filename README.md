@@ -1,106 +1,148 @@
 # 项目目的
+
 本项目计划基于Qwen3搭建一个法律知识信息问答系统。
+
 # 技术路线
+
 ## Retriever
+
 ### 数据集
+
 - 范围：包含中国生效的宪法、法律法规、行政法规、监察法规、司法解释、地方性法规共计9575篇
 - 来源：[国家法律法规数据库](https://flk.npc.gov.cn/index.html)
 - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
 - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，在权衡了GPU的推理速度和时间之后，将子集的大小设置为10000。
 - 数据生成：随机选取chunk作为正例样本，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
+
 ### Tokenizer
+
 为了配合Embedding的重训练和微调任务，tokenizer的使用方式分为以下两个分支
+
 - 重训练:将被筛选的出来的法律条文和对应的查询作为训练数据，vocab_size设定为和原模型tokenizer的vocab_size一样（vocab_size越大，输入对应的token的长度越短。并且原模型的Embedding矩阵维度固定，减小vocab_size也不会改变最终的softmax复杂度）。使用的是Byte-Level的BPE算法。前处理和后处理借鉴了原模型的tokenizer配置。
 - 直接使用：调用预训练模型对应的分词器
 
 数据集中的query， postive_doc， negative_doc在自己训练的tokenizer和现有的的tokenizer对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512
 ![evalRetrieverTokenLength](Figs/evalRetrieverTokenLength.jpg)
+
 ### Embedding 模型
+
 统一使用Qwen3-Embedding-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
-- 重新训练
+
 - 全量微调
 - QLoRA微调
 - Prefix微调
 
 # 结果及分析
+
 ## Retriever
+
 ### Tokenizer
+
 使用已分好块的语料库做测试，计算每一个chunk对应的Token数量的平均数。
-|     | Pretrained Tokenizer   | Retrained Tokenizer |
-|:---:|:---:|:---:|
-|  # of Mean Token  | 63.668085703592816 | 26.955351371121395 |
+
+|                | Pretrained Tokenizer | Retrained Tokenizer |
+| :-------------: | :------------------: | :-----------------: |
+| # of Mean Token |  63.668085703592816  | 26.955351371121395 |
 
 可以看出，重新训练的Tokenizer所需的平均Token数量更少，这是因为它是根据该任务特定的语料库作训练的，在针对性上做得更好。
 
 # 过程中的思考：
+
 ## 总方向
+
 - 为什么使用RAG？
-    - 因为法律规定过几年会改变，如果使用RAG的形式，可以直接修改知识库。而如果只微调模型让其记住这些法律知识，那么就需要将整个模型重新微调才能记住新的法律，并且可能会遗留下旧版本的法律的记忆。
+  - 因为法律规定过几年会改变，如果使用RAG的形式，可以直接修改知识库。而如果只微调模型让其记住这些法律知识，那么就需要将整个模型重新微调才能记住新的法律，并且可能会遗留下旧版本的法律的记忆。
 - 为什么做了RAG还要做微调呢？
-    - 因为没有经过微调的大模型只是在普遍场景下比较好，特定在法律知识问答任务下的能力并不是很好。
+  - 因为没有经过微调的大模型只是在普遍场景下比较好，特定在法律知识问答任务下的能力并不是很好。
+
 ## RAG
+
 - 为什么使用Byte Level的BPE分词？
-    -  因为这样分词能够解决 OOV（Out-Of-Vocabulary）问题，支持所有语言的输入。
+  - 因为这样分词能够解决 OOV（Out-Of-Vocabulary）问题，支持所有语言的输入。
 - 如下图所示，Tokenizer的训练中，vocab_size越大，平均chunk对应的token数量就越少，能够加速模型的推理速度，是不是vocab_size越大越好呢？
-![evalTokenizer](Figs/evalTokenizer.jpg)
-    - 不是的，因为vocab_size越大，需要存储的embedding矩阵就越大。
-    - 同时，如果词表中包含有一些极少见的词，也会使得模型缺少泛化性，过拟合。
-    - 如果 vocab_size 非常大，会引起 softmax 层计算复杂度增加（因为softmax 需遍历所有词表），这也会导致推理变慢。
+  ![evalTokenizer](Figs/evalTokenizer.jpg)
+  - 不是的，因为vocab_size越大，需要存储的embedding矩阵就越大。
+  - 同时，如果词表中包含有一些极少见的词，也会使得模型缺少泛化性，过拟合。
+  - 如果 vocab_size 非常大，会引起 softmax 层计算复杂度增加（因为softmax 需遍历所有词表），这也会导致推理变慢。
 - 为什么选择父子分段的切块方式？
-    - 因为该项目面向的时法律法规文件，带有很强的结构性（编、章、节、条）。所以切chunk时使用父子分段的方式设计多层结构。而常规的根据换行符或者特定符号分段的方式更适合其它资料
+  - 因为该项目面向的时法律法规文件，带有很强的结构性（编、章、节、条）。所以切chunk时使用父子分段的方式设计多层结构。而常规的根据换行符或者特定符号分段的方式更适合其它资料
 - 在RAG中，为什么先是Retriever，后是Reranker？
-    - 因为我们的第一步其实是从海量数据中筛选出一小批待选数据，如果使用Reranker那样的一一比对的方法，执行速度太慢了。而使用Retriver时，我们可以使用倒排索引等近似最近邻算法找到近似的搜索结果。
-    - 而经过Retriever之后，得到的结果是粗糙的。但是这时候我们地目标数据集是比较小的了，我们就可以使用Reranker精细地再筛选一次。
+  - 因为我们的第一步其实是从海量数据中筛选出一小批待选数据，如果使用Reranker那样的一一比对的方法，执行速度太慢了。而使用Retriver时，我们可以使用倒排索引等近似最近邻算法找到近似的搜索结果。
+  - 而经过Retriever之后，得到的结果是粗糙的。但是这时候我们地目标数据集是比较小的了，我们就可以使用Reranker精细地再筛选一次。
 - 在RAG中，为什么Retriever使用的是对比学习，而Reranker使用的是句对回归（不是句对分类）？
-    - 在Retriever中，我们想要的结果是：输入chunk，得到编码好的向量，所以常用对比学习。
-    - 而在Reranker中，我们希望得到的结果是：输入两个chunk，得到这两个chunk之间的相似度。同时，因为我们想要能够让用户控制这个相似度的阈值，所以不能是句对分类，只能是句对回归。
+  - 在Retriever中，我们想要的结果是：输入chunk，得到编码好的向量，所以常用对比学习。
+  - 而在Reranker中，我们希望得到的结果是：输入两个chunk，得到这两个chunk之间的相似度。同时，因为我们想要能够让用户控制这个相似度的阈值，所以不能是句对分类，只能是句对回归。
 - 在Embedding中，为什么使用的Transformer通常是双向注意力机制，而在训练LLM时，使用的是单向注意力机制？
-    - 在Embedding中，每个token需要看到同一chunk中其它token，这样才能结合句子中整体语义获得当前token的表达向量
-    - 在LLM中，我们的预计工作是根据现在已有的token预测下一个token，那么在训练时，就不应该让其能够看到之后的token。
+  - 在Embedding中，每个token需要看到同一chunk中其它token，这样才能结合句子中整体语义获得当前token的表达向量
+  - 在LLM中，我们的预计工作是根据现在已有的token预测下一个token，那么在训练时，就不应该让其能够看到之后的token。
+
 # 知识笔记
-- ```倒排索引```：倒排文件索引，也称为倒排索引，是一种数据结构，通过将数据组织成簇并在这些簇中存储对向量的引用来加速向量数据库中的相似性搜索 通过将搜索重点放在数据的较小子集上，可以有效地检索相似的向量，从而显著减少计算开销。以下是其工作原理的详细说明：
-    - 聚类：
-        - 使用 K 均值聚类等技术将向量数据集划分为聚类。
-        - 每个聚类都与一个质心相关联，质心代表聚类的“中心”。
-        - 数据集中的每个向量都根据距离分配到其最近的聚类。
-    - 倒排文件创建： 
-        - 创建一个倒排文件索引，将每个聚类（质心）映射到属于该聚类的向量列表。
-        - 该列表充当索引，允许快速访问特定集群内的向量。 
-    - 搜索过程： 
-        - 当引入查询向量时，计算其到每个聚类质心的距离。
-        - 确定最近的质心（及其对应的聚类）。
-        - 将相似向量的搜索范围缩小到该簇内的向量，而不是整个数据集。
+
+- ``倒排索引``：倒排文件索引，也称为倒排索引，是一种数据结构，通过将数据组织成簇并在这些簇中存储对向量的引用来加速向量数据库中的相似性搜索 通过将搜索重点放在数据的较小子集上，可以有效地检索相似的向量，从而显著减少计算开销。以下是其工作原理的详细说明：
+  - 聚类：
+    - 使用 K 均值聚类等技术将向量数据集划分为聚类。
+    - 每个聚类都与一个质心相关联，质心代表聚类的“中心”。
+    - 数据集中的每个向量都根据距离分配到其最近的聚类。
+  - 倒排文件创建：
+    - 创建一个倒排文件索引，将每个聚类（质心）映射到属于该聚类的向量列表。
+    - 该列表充当索引，允许快速访问特定集群内的向量。
+  - 搜索过程：
+    - 当引入查询向量时，计算其到每个聚类质心的距离。
+    - 确定最近的质心（及其对应的聚类）。
+    - 将相似向量的搜索范围缩小到该簇内的向量，而不是整个数据集。
+
 # 项目日志
+
 ## 20250709
+
 - 今天发现，如果只使用民法典作分词处理，即使将tokenizer的vocab_size设置为151669，实际上训练出来的tokenizer的vocab_size也只有9139。这说明民法典中的语料也不足够。引入刑法之后，训练的tokenizer的vocab_size也只有12906。再引入了劳动法，vocab_size是13351。说明，需要足够多的文件才能够训练出vocab_size满足要求的tokenizer
 - 之前处理法律文件时，对每一个法律都要单独处理，这样费时费力，并且每次都需要对每个法律文件进行调整。为了解决这个问题，统一从[国家法律法规数据库](https://flk.npc.gov.cn/index.html)中下载数据，保证格式的一致性。
 - 在下载文件时，发现文件内容特别多，所以使用爬虫爬取，节约人力成本
+
 ## 20250711
+
 - 在使用github desktop时，发现自己对于git命令生疏了，也就意味着目前缺乏项目工程管理能力，需要重新学习这方面知识
 - 原本计划将中国所有法律法规都引入，但是发现如果全部引入，那么微调和训练embedding的问答数据库所需时间需要一年，不符合实际，所以必须减少数据库的数量
+
 ## 20250716
+
 - 决定使用降采样的方式减少数据库数量，初步计划按照顺序每50个条文采样一个条文，但是这样忽略了文本中语义的重要性。为了解决这个问题，使用Qwen3-Embedding-0.6B将法律条文信息转为向量信息，再在向量空间中选出覆盖性最强、彼此差异最大的子集。
+
 ## 20250718
+
 - 发现之前用的向量距离是欧式距离，但是该任务中需要的是余弦距离。这是粗心犯的错
 - 在降维法律的embedding向量时使用的是PCA，导致可视化分析不可靠。
 - 在设计贪心算法时，原来使用的是Numpy，生成一次结果需要两小时半，速度太慢了，改用pytorch并使用cuda加速，同时优化了算法强化了计算的并行性，现在计算一次时间只需要2分钟。
 - 在使用self instruct生成训练retriever的embedding model的数据集时，发现提示词的设计密切关系到生成的query的质量。这说明提示词的设计很有必要性。
+
 ## 20250721
+
 - 在重训练Embedding模型时，发现按照原始qwen3-embedding-0.6b的设置去训练会爆内存。经过分析发现，这是因为Embedding模型设置的max_length太大了。同时，经过类比分析，认为没有必要将Retriever的tokenizer的vocab_size设定为与原文一致。这说明每个参数的大小设定都必须有根据，不能盲目或者跟风设置。
 - 在查看筛选出来的数据集时，发现有些正例文档和负例文档不完整，经过研究发现，是在做正则处理时过滤页码时将一些行也过滤了。同时还发现之前在过滤文本中的不合法符号时，将一些合法符号如逗号、括号等也过滤了。
+
 ## 20250722
+
 - 在检查筛选数据时，发现仍然有部分数据不完整的情况。发现是源文件本身存在问题，排除代码层面上的错误。
+
 ## 20250724
+
 - 之前使用ollama部署的qwen3:32b模型去生成retriever训练数据集，但是这样的速度很慢，并且生成的问答对质量不高，为了解决这个问题，改用阿里云百炼的api调用模型完成。
+
 ## 20250725
+
 - 在使用RetrieverDataset_selfinstruct时，发现里面有些元素值是nan，将positive_doc为nan的行删除，从所有positive_doc中采样替换为nan的negative_doc。由于使用了贪心算法进行采样，positive_doc之间具有较强的不相关性，所以可以被用来替换掉为nan的negative_doc。
 
+## 20250805
+
+- 之前重训练的Tokenizer只在法律文档和query上训练，这会导致当用户问一些和法律无关的问题时，模型无法处理，所以要修改Tokenizer的训练方法。同时，从实验中舍弃重新训练Embedding模型的技术路线。
+
 # 参考文献
-[^1]:```bibtex
-    @article{qwen3embedding,
-        title={Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
-        author={Zhang, Yanzhao and Li, Mingxin and Long, Dingkun and Zhang, Xin and Lin, Huan and Yang, Baosong and Xie, Pengjun and Yang, An and Liu, Dayiheng and Lin, Junyang and Huang, Fei and Zhou, Jingren},
-        journal={arXiv preprint arXiv:2506.05176},
-        year={2025}
-    }
-    ```
+
+[^1]: ```bibtex
+                   @article{qwen3embedding,
+                       title={Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
+                       author={Zhang, Yanzhao and Li, Mingxin and Long, Dingkun and Zhang, Xin and Lin, Huan and Yang, Baosong and Xie, Pengjun and Yang, An and Liu, Dayiheng and Lin, Junyang and Huang, Fei and Zhou, Jingren},
+                       journal={arXiv preprint arXiv:2506.05176},
+                       year={2025}
+                   }
+       ```
