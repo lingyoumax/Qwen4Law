@@ -18,10 +18,9 @@
 
 为了配合Embedding的重训练和微调任务，tokenizer的使用方式分为以下两个分支
 
-- 重训练:将被筛选的出来的法律条文和对应的查询作为训练数据，vocab_size设定为和原模型tokenizer的vocab_size一样（vocab_size越大，输入对应的token的长度越短。并且原模型的Embedding矩阵维度固定，减小vocab_size也不会改变最终的softmax复杂度）。使用的是Byte-Level的BPE算法。前处理和后处理借鉴了原模型的tokenizer配置。
 - 直接使用：调用预训练模型对应的分词器
 
-数据集中的query， postive_doc， negative_doc在自己训练的tokenizer和现有的的tokenizer对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512
+数据集中的query， postive_doc， negative_doc在现有的的tokenizer下对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512
 ![evalRetrieverTokenLength](Figs/evalRetrieverTokenLength.jpg)
 
 ### Embedding 模型
@@ -36,15 +35,6 @@
 
 ## Retriever
 
-### Tokenizer
-
-使用已分好块的语料库做测试，计算每一个chunk对应的Token数量的平均数。
-
-|                | Pretrained Tokenizer | Retrained Tokenizer |
-| :-------------: | :------------------: | :-----------------: |
-| # of Mean Token |  63.668085703592816  | 26.955351371121395 |
-
-可以看出，重新训练的Tokenizer所需的平均Token数量更少，这是因为它是根据该任务特定的语料库作训练的，在针对性上做得更好。
 
 # 过程中的思考：
 
@@ -134,7 +124,7 @@
 
 ## 20250805
 
-- 之前重训练的Tokenizer只在法律文档和query上训练，这会导致当用户问一些和法律无关的问题时，模型无法处理，所以要修改Tokenizer的训练方法。同时，从实验中舍弃重新训练Embedding模型的技术路线。
+- 之前重训练的Tokenizer只在法律文档和query上训练，这会导致当用户问一些和法律无关的问题时，模型无法处理，所以仍旧使用预训练好的分词器。同时，从实验中舍弃重新训练Embedding模型的技术路线。
 
 # 参考文献
 

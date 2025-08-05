@@ -25,9 +25,3 @@ for idx, row in df.iterrows():
             candidate_idx += 1
 
 df.to_csv("RetrieverDataset_selfinstruct_cleaned.csv", index=False, encoding="utf-8-sig")
-
-query = df['query'].tolist()
-
-with open('RetrieverQuery.txt', 'w', encoding='utf-8') as f:
-    for item in query:
-        f.write(f"{item}\n")

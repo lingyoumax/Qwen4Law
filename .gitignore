@@ -8,7 +8,5 @@ config.py
 *.npy
 EmbeddingModel_Retrain/
 EmbeddingModel_QLoRA/
-EmbeddingModel_Full/
 EmbeddingModel_Prefix/
-RetrieverTokenizer/
 laws/
