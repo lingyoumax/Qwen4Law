@@ -1,11 +1,5 @@
-from modelscope import AutoModel, AutoTokenizer
 from transformers import BatchEncoding
-from datasets import Dataset
 import torch
-import pandas as pd
-from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
-from peft import TaskType, prepare_model_for_kbit_training, PrefixTuningConfig, get_peft_model
 import torch
 import torch.nn.functional as F
 import os
