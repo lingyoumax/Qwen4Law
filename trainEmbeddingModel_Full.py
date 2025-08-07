@@ -9,14 +9,15 @@ import torch.nn.functional as F
 import os
 
 from settings import num_negative_docs, device, embedding_max_length, random_seed, retriever_modelname, embedding_test_ratio, embedding_batch_size
-from tools import last_token_pool, evaluateEmbeddingModel
+from tools import last_token_pool, evaluateEmbeddingModel, drawEmbeddingLoss
 
 lr=2e-5
 n_epoch=10
 temperature = 0.05
+savePath = "EmbeddingModel_Full"
 
-if not os.path.exists("EmbeddingModel_Full"):
-    os.mkdir("EmbeddingModel_Full")
+if not os.path.exists(savePath):
+    os.mkdir(savePath)
 
 df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
 
@@ -89,8 +90,11 @@ test_dataloader = DataLoader(
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
 best_recall = 0.0  # 用于追踪最佳 Recall@1
+Loss = []
+Recall = []
 
 for epoch in tqdm(range(n_epoch), desc="Training"):
+    l=0
     for batch in train_dataloader:
         optimizer.zero_grad()
         query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
@@ -132,13 +136,18 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Z))
         loss.backward()
         optimizer.step()
+        l=l+loss.item()
 
     # === Evaluate ===
+    l=l/len(train_dataloader)
     recall = evaluateEmbeddingModel(model, test_dataloader)
-    tqdm.write(f"Epoch {epoch}: Avg Loss = {loss:.4f}, Recall@1 = {recall:.4f}")
+    tqdm.write(f"Epoch {epoch}: Avg Loss = {l:.4f}, Recall@1 = {recall:.4f}")
+    Loss.append(l)
+    Recall.append(recall)
 
     if recall > best_recall:
         best_recall = recall
-        torch.save(model.state_dict(), 'EmbeddingModel_Full/EmbeddingModel_Full.pth')
+        torch.save(model.state_dict(), f'{savePath}/EmbeddingModel_Full_best.pth')
 
-torch.save(model, 'EmbeddingModel_Full/EmbeddingModel_Full.pth')
+torch.save(model, f'{savePath}/EmbeddingModel_Full_Final.pth')
+drawEmbeddingLoss(Loss, Recall) 
