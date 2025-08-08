@@ -77,9 +77,8 @@ def drawEmbeddingLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))
 
     plt.subplot(1, 2, 1)
-    plt.plot(np.arange(1, len(TrainLoss) + 1), TrainLoss, color='limegreen')
+    plt.plot(TrainLoss, color='limegreen')
     plt.xlabel('Epoch')
-    plt.xlim(1, None)
     plt.ylabel("Loss of Training Set")
 
     plt.subplot(1, 2, 2)
