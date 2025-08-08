@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 
 from settings import device, num_negative_docs
 
@@ -68,8 +69,9 @@ def drawEmbeddingLoss(saveName, Loss, Recall):
     plt.figure(figsize=(20, 10))
 
     plt.subplot(1, 2, 1)
-    plt.plot(Loss, color='limegreen')
+    plt.plot(np.arange(1, len(Loss) + 1), Loss, color='limegreen')
     plt.xlabel('Epoch')
+    plt.xlim(1, None)
     plt.ylabel("Loss of Training Set")
 
     plt.subplot(1, 2, 2)
