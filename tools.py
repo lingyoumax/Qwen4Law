@@ -25,58 +25,67 @@ def last_token_pool(last_hidden_states, attention_mask):
         batch_size = last_hidden_states.shape[0]
         return last_hidden_states[torch.arange(batch_size, device=device), sequence_lengths]
     
-def evaluateEmbeddingModel(model, dataloader):
+def evaluateEmbeddingModel(model, dataloader, temperature):
     model.eval()
-    correct = 0
-    total = 0
+    l = 0
+    total = len(dataloader)
     with torch.no_grad():
         for batch in dataloader:
-            query_dict = BatchEncoding({"input_ids": batch["query_input_ids"], "attention_mask": batch["query_attention_mask"]})
+            query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
             query_output = model(**query_dict)
-            query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])
+            query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])#batch_size * embedding_length
             query_embedding = F.normalize(query_embedding, dim=1)
 
-            positive_dict = BatchEncoding({"input_ids": batch["positive_input_ids"], "attention_mask": batch["positive_attention_mask"]})
+            positive_dict=BatchEncoding({"input_ids":batch["positive_input_ids"],"attention_mask":batch["positive_attention_mask"]})
             positive_output = model(**positive_dict)
-            positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])
+            positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])#batch_size * embedding_length
             positive_embedding = F.normalize(positive_embedding, dim=1)
 
-            negative_embeddings = []
+            negative_embeddings=[]
             for i in range(num_negative_docs):
-                neg_dict = BatchEncoding({
-                    "input_ids": batch[f"negative_input_ids_{i}"],
-                    "attention_mask": batch[f"negative_attention_mask_{i}"]
-                })
-                neg_output = model(**neg_dict)
-                neg_embedding = last_token_pool(neg_output.last_hidden_state, batch[f"negative_attention_mask_{i}"])
-                neg_embedding = F.normalize(neg_embedding, dim=1)
-                negative_embeddings.append(neg_embedding)
+                negative_dict_i=BatchEncoding({"input_ids":batch[f"negative_input_ids_{i}"],"attention_mask":batch[f"negative_attention_mask_{i}"]})
+                negative_output_i = model(**negative_dict_i)
+                negative_embedding_i = last_token_pool(negative_output_i.last_hidden_state, batch[f"negative_attention_mask_{i}"])#batch_size * embedding_length
+                negative_embedding_i = F.normalize(negative_embedding_i, dim=1)
+                negative_embeddings.append(negative_embedding_i)
+            
+            B = query_embedding.size(0)
 
-            # 将正负例拼接在一起，计算相似度
-            candidates = torch.stack([positive_embedding] + negative_embeddings, dim=1)  # [B, 1+K, D]
-            query_embedding = query_embedding.unsqueeze(1)  # [B, 1, D]
-            sims = torch.sum(query_embedding * candidates, dim=2)  # [B, 1+K]
+            negatives_stacked = torch.stack(negative_embeddings)
 
-            # 预测最相似的是哪一个文档（0 表示 positive）
-            preds = sims.argmax(dim=1)
-            correct += (preds == 0).sum().item()
-            total += sims.size(0)
+            sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature
+            sim_q_neg=torch.sum(query_embedding.unsqueeze(0) * negatives_stacked, dim=2).T / temperature
+            sim_q_q=query_embedding @ query_embedding.T / temperature
+            sim_pos_dj = positive_embedding @ positive_embedding.T / temperature
+            sim_q_dj = query_embedding @ positive_embedding.T /temperature
+
+            m = torch.ones_like(sim_q_q, dtype=torch.bool, device=device)
+            diag_indices = torch.arange(sim_q_q.size(0), device=device)
+            m[diag_indices, diag_indices] = False
+            thresholds = sim_q_pos.unsqueeze(1).expand(-1, B) + 0.1
+            too_similar = sim_q_q > thresholds
+            m = m & (~too_similar)
+
+            Z = torch.exp(sim_q_pos) + torch.sum(torch.exp(sim_q_neg), dim=1) + torch.sum(m * torch.exp(sim_q_q), dim=1) + torch.sum(m * torch.exp(sim_pos_dj), dim=1)+ torch.sum(m * torch.exp(sim_q_dj), dim=1)
+            loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Z))
+            l = l + loss.item()
+        
 
     model.train()
-    return correct / total if total > 0 else 0
+    return l/total if total > 0 else 0
 
-def drawEmbeddingLoss(saveName, Loss, Recall):
+def drawEmbeddingLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))
 
     plt.subplot(1, 2, 1)
-    plt.plot(np.arange(1, len(Loss) + 1), Loss, color='limegreen')
+    plt.plot(np.arange(1, len(TrainLoss) + 1), TrainLoss, color='limegreen')
     plt.xlabel('Epoch')
     plt.xlim(1, None)
     plt.ylabel("Loss of Training Set")
 
     plt.subplot(1, 2, 2)
-    plt.plot(Recall, color='darkviolet')
+    plt.plot(TestLoss, color='darkviolet')
     plt.xlabel('Epoch')
-    plt.ylabel("Recall@1 of Test Set")
+    plt.ylabel("Loss of Test Set")
 
     plt.savefig(f"Figs/drawEmbeddingLoss_{saveName}.svg")
