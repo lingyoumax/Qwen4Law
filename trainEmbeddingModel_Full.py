@@ -91,6 +91,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
 TrainLoss = []
 TestLoss = []
+TrainLoss.append(evaluateEmbeddingModel(model, train_dataloader, temperature))
 TestLoss.append(evaluateEmbeddingModel(model, test_dataloader, temperature))
 best_testloss=TestLoss[0]
 
