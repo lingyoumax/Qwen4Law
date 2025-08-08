@@ -69,8 +69,7 @@ def evaluateEmbeddingModel(model, dataloader, temperature):
             Z = torch.exp(sim_q_pos) + torch.sum(torch.exp(sim_q_neg), dim=1) + torch.sum(m * torch.exp(sim_q_q), dim=1) + torch.sum(m * torch.exp(sim_pos_dj), dim=1)+ torch.sum(m * torch.exp(sim_q_dj), dim=1)
             loss = -torch.mean(torch.log(torch.exp(sim_q_pos) / Z))
             l = l + loss.item()
-        
-
+            
     model.train()
     return l/total if total > 0 else 0
 
