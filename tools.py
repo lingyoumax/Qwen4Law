@@ -64,7 +64,7 @@ def evaluateEmbeddingModel(model, dataloader):
     model.train()
     return correct / total if total > 0 else 0
 
-def drawEmbeddingLoss(savePath, Loss, Recall):
+def drawEmbeddingLoss(saveName, Loss, Recall):
     plt.figure(figsize=(20, 10))
 
     plt.subplot(1, 2, 1)
@@ -77,4 +77,4 @@ def drawEmbeddingLoss(savePath, Loss, Recall):
     plt.xlabel('Epoch')
     plt.ylabel("Recall@1 of Test Set")
 
-    plt.savefig(f"{savePath}/drawEmbeddingLoss.svg")
+    plt.savefig(f"Figs/drawEmbeddingLoss_{saveName}.svg")

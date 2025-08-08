@@ -147,7 +147,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
 
     if recall > best_recall:
         best_recall = recall
-        torch.save(model.state_dict(), f'{savePath}/EmbeddingModel_Full_best.pth')
+        torch.save(model.state_dict(), f'{savePath}/EmbeddingModel_Full_Best.pth')
 
 torch.save(model, f'{savePath}/EmbeddingModel_Full_Final.pth')
-drawEmbeddingLoss(Loss, Recall) 
+drawEmbeddingLoss(savePath, Loss, Recall)  
