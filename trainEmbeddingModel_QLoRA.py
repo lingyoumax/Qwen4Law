@@ -13,7 +13,7 @@ import os
 from settings import num_negative_docs, device, embedding_max_length, random_seed, retriever_modelname, embedding_test_ratio, embedding_batch_size
 from tools import last_token_pool, evaluateEmbeddingModel, drawEmbeddingLoss
 
-lr=2e-5
+lr=1e-5
 n_epoch=10
 temperature = 0.05
 savePath = "EmbeddingModel_QLoRA"
@@ -115,6 +115,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 best_recall = 0.0  # 用于追踪最佳 Recall@1
 Loss = []
 Recall = []
+Recall.append(evaluateEmbeddingModel(model, test_dataloader))
 
 for epoch in tqdm(range(n_epoch), desc="Training"):
     l = 0
