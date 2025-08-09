@@ -38,7 +38,7 @@ test_dataset = dataset_split["test"]
 
 model = AutoModel.from_pretrained(
     retriever_modelname,
-    device_map="auto"
+    device_map= device
 )
 
 model.train()
