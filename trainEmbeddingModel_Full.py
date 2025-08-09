@@ -147,7 +147,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
     TrainLoss.append(trainloss)
     TestLoss.append(testloss)
 
-    if testloss > best_testloss:
+    if testloss < best_testloss:
         best_testloss = testloss
         torch.save(model.state_dict(), f'{savePath}/{savePath}_Best.pth')
 
