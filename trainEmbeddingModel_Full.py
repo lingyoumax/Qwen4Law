@@ -42,7 +42,7 @@ model = AutoModel.from_pretrained(
 )
 
 model.train()
-tokenizer = AutoTokenizer.from_pretrained('RetrieverTokenizer', padding_side='left')
+tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
 
 def tokenize_function(example):
     query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
