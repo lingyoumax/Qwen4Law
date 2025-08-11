@@ -43,13 +43,10 @@ model = AutoModel.from_pretrained(
 for param in model.parameters():
     param.requires_grad = False
 
-# 解冻最后两层解码器层的参数（根据Qwen3的结构）
-# 假设layers是一个ModuleList，最后两层的索引是-1和-2
-for layer in model.layers[-2:]:  # 只训练最后两层
+for layer in model.layers[-2:]:
     for param in layer.parameters():
         param.requires_grad = True
 
-# 也可以考虑解冻最终的归一化层
 for param in model.norm.parameters():
     param.requires_grad = True
 
