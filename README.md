@@ -34,10 +34,10 @@
 由于在微调前，模型的Recall@1已经达到了0.9995，所以不能直接比较Recall@1。使用分离度来衡量改进。
 $$margin = sim(q,d^+)-max_i(sim(q,d_i^-))$$
 
-|Model|GPU Memory Usage(MiB)|Margin|
+|Model|GPU Memory Usage(MiB) while Training|Margin on Test Set|
 |---|---|---|
-|Base Model|/| 0.4380992329120636 |
-|QLoRA|3338| | 
+|Base Model|-| 0.4380992329120636 |
+|QLoRA|3338| 0.6375383169054986 | 
 |Freeze|4826|| 
 
 
@@ -138,10 +138,9 @@ $$margin = sim(q,d^+)-max_i(sim(q,d_i^-))$$
 # 参考文献
 
 [^1]: ```bibtex
-                   @article{qwen3embedding,
-                       title={Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
-                       author={Zhang, Yanzhao and Li, Mingxin and Long, Dingkun and Zhang, Xin and Lin, Huan and Yang, Baosong and Xie, Pengjun and Yang, An and Liu, Dayiheng and Lin, Junyang and Huang, Fei and Zhou, Jingren},
-                       journal={arXiv preprint arXiv:2506.05176},
-                       year={2025}
-                   }
-       ```
+    @article{qwen3embedding,
+    title={Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
+    author={Zhang, Yanzhao and Li, Mingxin and Long, Dingkun and Zhang, Xin and Lin, Huan and Yang, Baosong and Xie, Pengjun and Yang, An and Liu, Dayiheng and Lin, Junyang and Huang, Fei and Zhou, Jingren},
+    journal={arXiv preprint arXiv:2506.05176},
+    year={2025}
+    }
