@@ -32,11 +32,13 @@
 
 ## Retriever
 由于在微调前，模型的Recall@1已经达到了0.9995，所以不能直接比较Recall@1。使用分离度来衡量改进。
-|Model|GPU Memory Usage(MiB)|Loss on Test Set|
+$$margin = sim(q,d^+)-max_i(sim(q,d_i^-))$$
+
+|Model|GPU Memory Usage(MiB)|Margin|
 |---|---|---|
-|Base Model|/||
-|QLoRA|3338| |
-|Freeze|4826||
+|Base Model|/| 0.4380992329120636 |
+|QLoRA|3338| | 
+|Freeze|4826|| 
 
 
 # 过程中的思考：
