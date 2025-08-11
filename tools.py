@@ -75,7 +75,7 @@ def evaluateEmbeddingModel(model, dataloader, temperature):
     model.train()
     return l/total if total > 0 else 0
 
-def evaluateTrainedEmbeddingModel(model, dataloader, temperature):
+def evaluateTrainedEmbeddingModel(model, dataloader):
     # 计算模型在测试集上的分离度
     model.eval()
     margin = 0
@@ -104,8 +104,8 @@ def evaluateTrainedEmbeddingModel(model, dataloader, temperature):
 
             negatives_stacked = torch.stack(negative_embeddings)
 
-            sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1) / temperature
-            sim_q_negs=torch.sum(query_embedding.unsqueeze(0) * negatives_stacked, dim=2).T / temperature
+            sim_q_pos = torch.sum(query_embedding * positive_embedding, dim=1)
+            sim_q_negs=torch.sum(query_embedding.unsqueeze(0) * negatives_stacked, dim=2).T
             sim_q_neg=torch.amax(sim_q_negs, dim=1)
             
             margin = margin + torch.sum(sim_q_pos-sim_q_neg).item()
