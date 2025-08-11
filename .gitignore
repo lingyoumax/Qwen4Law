@@ -6,7 +6,7 @@ config.py
 *.txt
 *.docx
 *.npy
-EmbeddingModel_Retrain/
+EmbeddingModel_Full/
 EmbeddingModel_QLoRA/
-EmbeddingModel_Prefix/
+EmbeddingModel_Freeze/
 laws/
