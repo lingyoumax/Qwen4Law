@@ -29,7 +29,7 @@ model = AutoModel.from_pretrained(
     device_map= device
 )
 
-model.train()
+model.eval()
 tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
 
 def tokenize_function(example):
