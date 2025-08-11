@@ -31,8 +31,10 @@
 # 结果及分析
 
 ## Retriever
-|Tuning Method|GPU Memory Usage(MiB)|Loss on Test Set|
+由于在微调前，模型的Recall@1已经达到了0.9995，所以不能直接比较Recall@1。使用分离度来衡量改进。
+|Model|GPU Memory Usage(MiB)|Loss on Test Set|
 |---|---|---|
+|Base Model|/||
 |QLoRA|3338| |
 |Freeze|4826||
 
