@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 import os
 import matplotlib.pyplot as plt
-import numpy as np
+from tqdm.auto import tqdm
 
 from settings import device, num_negative_docs
 
@@ -81,7 +81,7 @@ def evaluateTrainedEmbeddingModel(model, dataloader):
     margin = 0
     total = 0
     with torch.inference_mode():
-        for batch in dataloader:
+        for batch in tqdm(dataloader):
             query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
             query_output = model(**query_dict)
             query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])#batch_size * embedding_length
