@@ -16,9 +16,7 @@
 
 ### Tokenizer
 
-为了配合Embedding的重训练和微调任务，tokenizer的使用方式分为以下两个分支
-
-- 直接使用：调用预训练模型对应的分词器
+为了配合Embedding的微调任务，tokenizer直接使用预训练模型对应的分词器
 
 数据集中的query， postive_doc， negative_doc在现有的的tokenizer下对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512
 ![evalRetrieverTokenLength](Figs/evalRetrieverTokenLength.jpg)
@@ -27,13 +25,16 @@
 
 统一使用Qwen3-Embedding-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
 
-- 全量微调
 - QLoRA微调
-- Prefix微调
+- Freeze微调
 
 # 结果及分析
 
 ## Retriever
+|Tuning Method|GPU Memory Usage(MiB)|Loss on Test Set|
+|---|---|---|
+|QLoRA|3338| |
+|Freeze|4826||
 
 
 # 过程中的思考：
