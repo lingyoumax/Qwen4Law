@@ -1,23 +1,11 @@
 from datasets import Dataset
 import pandas as pd
-from modelscope import AutoConfig, AutoModel, AutoTokenizer
-from transformers import BatchEncoding
+from modelscope import AutoModel, AutoTokenizer
 import torch
 from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
-import torch.nn.functional as F
-import os
 
 from settings import num_negative_docs, device, embedding_max_length, random_seed, retriever_modelname, embedding_test_ratio, embedding_batch_size
-from tools import last_token_pool, evaluateTrainedEmbeddingModel, evaluateEmbeddingModel
-
-lr=1e-5
-n_epoch=10
-temperature = 0.05
-savePath = "EmbeddingModel_Full"
-
-if not os.path.exists(savePath):
-    os.mkdir(savePath)
+from tools import evaluateTrainedEmbeddingModel
 
 df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
 
