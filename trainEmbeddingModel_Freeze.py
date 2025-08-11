@@ -50,7 +50,7 @@ for layer in model.layers[-2:]:
 for param in model.norm.parameters():
     param.requires_grad = True
 
-model.eval()
+model.train()
 tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
 
 def tokenize_function(example):
