@@ -21,7 +21,6 @@ data = [row_to_sample(row) for _, row in df.iterrows()]
 
 dataset = Dataset.from_list(data)
 dataset_split = dataset.train_test_split(test_size = embedding_test_ratio, seed = random_seed)
-train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
 model = AutoModel.from_pretrained(
@@ -50,7 +49,6 @@ def tokenize_function(example):
 
     return features
 
-tokenized_train_dataset = train_dataset.map(tokenize_function, remove_columns=train_dataset.column_names)
 tokenized_test_dataset = test_dataset.map(tokenize_function, remove_columns=test_dataset.column_names)
 
 def collate_fn(batch):
@@ -62,12 +60,6 @@ def collate_fn(batch):
 
     return batch_dict
 
-train_dataloader = DataLoader(
-    tokenized_train_dataset,
-    batch_size = embedding_batch_size,
-    shuffle = True,
-    collate_fn=collate_fn
-)
 test_dataloader = DataLoader(
     tokenized_test_dataset,
     batch_size = embedding_batch_size,

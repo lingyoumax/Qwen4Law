@@ -37,8 +37,8 @@ $$margin = sim(q,d^+)-max_i(sim(q,d_i^-))$$
 |Model|GPU Memory Usage(MiB) while Training|Margin on Test Set|
 |---|---|---|
 |Base Model|-| 0.4380992329120636 |
-|Freeze|19096|0.6184983230829239| 
-|QLoRA|4686| 0.6375383169054986 | 
+|Freeze|19096|0.6184983235597611| 
+|QLoRA|4686| 0.7048807286024094 | 
 
 
 # 过程中的思考：

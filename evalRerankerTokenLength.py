@@ -18,13 +18,21 @@ def format_instruction(query, doc):
 
 pair_token_len = []
 
+prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
+suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+prefix_tokens = tokenizer.encode(prefix, add_special_tokens=False)
+suffix_tokens = tokenizer.encode(suffix, add_special_tokens=False)
+
+prefix_token_len = len(prefix_tokens)
+suffix_token_len = len(suffix_tokens)
+
 for _, d in df.iterrows():
     pair = format_instruction(d['query'], d["positive_doc"])
-    pair_token_len.append(len(tokenizer(pair, padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]))
+    pair_token_len.append(prefix_token_len + suffix_token_len + len(tokenizer(pair, padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]))
 
     for i in range(num_negative_docs):
         pair = format_instruction(d['query'], d[f"negative_doc{i}"])
-        pair_token_len.append(len(tokenizer(pair, padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]))
+        pair_token_len.append(prefix_token_len + suffix_token_len + len(tokenizer(pair, padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]))
 
 
 pair_mean = np.mean(pair_token_len)
