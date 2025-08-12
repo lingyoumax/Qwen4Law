@@ -115,7 +115,37 @@ def evaluateTrainedEmbeddingModel(model, dataloader):
     model.train()
     return margin/total if total > 0 else 0
 
-def drawEmbeddingLoss(saveName, TrainLoss, TestLoss):
+def computeRerankerScore(model, inputs, token_true_id, token_false_id, ind = 0):
+    batch_scores = model(**inputs).logits[:, -1, :]
+    true_vector = batch_scores[:, token_true_id]
+    false_vector = batch_scores[:, token_false_id]
+    batch_scores = torch.stack([true_vector, false_vector], dim=1)
+    batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
+    scores = batch_scores[:, ind]
+    return scores
+
+def evaluateRerankerModel(model, dataloader, token_true_id , token_false_id):
+    # 计算模型在测试集上的Loss
+    model.eval()
+    l = 0
+    total = len(dataloader)
+    with torch.inference_mode():
+        for batch in tqdm(dataloader):
+            positive_pair_dict=BatchEncoding({"input_ids":batch["positive_pair_input_ids"],"attention_mask":batch["positive_pair_attention_mask"]})
+            scores = computeRerankerScore(model, positive_pair_dict, token_true_id, token_false_id)
+        
+            for i in range(num_negative_docs):
+                negative_pair_dict_i=BatchEncoding({"input_ids":batch[f"negative_pair_input_ids_{i}"],"attention_mask":batch[f"negative_pair_attention_mask_{i}"]})
+                negative_pair_score_i = computeRerankerScore(model, negative_pair_dict_i, token_true_id, token_false_id, 1)
+                scores = scores + negative_pair_score_i
+        
+            loss = -torch.mean(scores-torch.log(torch.tensor(1+num_negative_docs)))
+            l = l+loss.item()
+            
+    model.train()
+    return l/total if total > 0 else 0
+
+def drawLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))
 
     plt.subplot(1, 2, 1)
@@ -128,4 +158,4 @@ def drawEmbeddingLoss(saveName, TrainLoss, TestLoss):
     plt.xlabel('Epoch')
     plt.ylabel("Loss of Test Set")
 
-    plt.savefig(f"Figs/drawEmbeddingLoss_{saveName}.svg")
+    plt.savefig(f"Figs/{saveName}.svg")

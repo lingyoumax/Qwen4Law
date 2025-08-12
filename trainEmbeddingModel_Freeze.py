@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import os
 
 from settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
-from tools import last_token_pool, evaluateEmbeddingModel, drawEmbeddingLoss
+from tools import last_token_pool, evaluateEmbeddingModel, drawLoss
 
 lr=1e-5
 n_epoch=10
@@ -92,7 +92,7 @@ train_dataloader = DataLoader(
 test_dataloader = DataLoader(
     tokenized_test_dataset,
     batch_size = embedding_batch_size,
-    shuffle = True,
+    shuffle = False,
     collate_fn=collate_fn
 )
 
@@ -163,4 +163,4 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         torch.save(model.state_dict(), f'{savePath}/{savePath}_Best.pth')
 
 torch.save(model, f'{savePath}/{savePath}_Final.pth')
-drawEmbeddingLoss(savePath, TrainLoss, TestLoss)  
+drawLoss(savePath, TrainLoss, TestLoss)  

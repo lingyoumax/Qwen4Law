@@ -64,7 +64,7 @@ def collate_fn(batch):
 test_dataloader = DataLoader(
     tokenized_test_dataset,
     batch_size = embedding_batch_size,
-    shuffle = True,
+    shuffle = False,
     collate_fn=collate_fn
 )
 
