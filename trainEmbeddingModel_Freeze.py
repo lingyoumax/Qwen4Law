@@ -43,7 +43,7 @@ model = AutoModel.from_pretrained(
 for param in model.parameters():
     param.requires_grad = False
 
-for layer in model.layers[-2:]:
+for layer in model.layers[-4:]:
     for param in layer.parameters():
         param.requires_grad = True
 
