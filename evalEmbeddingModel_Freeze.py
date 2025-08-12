@@ -4,7 +4,7 @@ from modelscope import AutoModel, AutoTokenizer
 import torch
 from torch.utils.data import DataLoader
 
-from settings import num_negative_docs, device, embedding_max_length, random_seed, retriever_modelname, embedding_test_ratio, embedding_batch_size
+from settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
 from tools import evaluateTrainedEmbeddingModel
 
 df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
@@ -25,13 +25,13 @@ train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
 model = AutoModel.from_pretrained(
-    retriever_modelname,
+    embedding_modelname,
     device_map= device
 )
 state_dict = torch.load("EmbeddingModel_Freeze/EmbeddingModel_Freeze_Best.pth", map_location=device)
 model.load_state_dict(state_dict)
 model.eval()
-tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
+tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
 
 def tokenize_function(example):
     query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")

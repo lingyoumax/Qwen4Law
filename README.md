@@ -18,27 +18,27 @@
 
 为了配合Embedding的微调任务，tokenizer直接使用预训练模型对应的分词器
 
-数据集中的query， postive_doc， negative_doc在现有的的tokenizer下对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512
-![evalRetrieverTokenLength](Figs/evalRetrieverTokenLength.jpg)
+数据集中的query， postive_doc， negative_doc在现有的的tokenizer下对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512。
+![evalEmbeddingTokenLength](Figs/evalEmbeddingTokenLength.jpg)
 
 ### Embedding 模型
 
 统一使用Qwen3-Embedding-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
 
-- QLoRA微调
-- Freeze微调
+- Freeze微调：全参数微调模型中最后四层的layers和归一化层
+- QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 
 # 结果及分析
 
-## Retriever
+## Embedding Model
 由于在微调前，模型的Recall@1已经达到了0.9995，所以不能直接比较Recall@1。使用分离度来衡量改进。
 $$margin = sim(q,d^+)-max_i(sim(q,d_i^-))$$
 
 |Model|GPU Memory Usage(MiB) while Training|Margin on Test Set|
 |---|---|---|
 |Base Model|-| 0.4380992329120636 |
-|QLoRA|3338| 0.6375383169054986 | 
-|Freeze|4826|| 
+|Freeze|19096|0.6184983230829239| 
+|QLoRA|4686| 0.6375383169054986 | 
 
 
 # 过程中的思考：

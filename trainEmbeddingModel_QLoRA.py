@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 import os
 
-from settings import num_negative_docs, device, embedding_max_length, random_seed, retriever_modelname, embedding_test_ratio, embedding_batch_size
+from settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
 from tools import last_token_pool, evaluateEmbeddingModel, drawEmbeddingLoss
 
 lr=1e-5
@@ -46,7 +46,7 @@ bnb_config = BitsAndBytesConfig(
 )
 
 model = AutoModel.from_pretrained(
-    retriever_modelname,
+    embedding_modelname,
     quantization_config=bnb_config,
     device_map = device
 )
@@ -65,7 +65,7 @@ lora_config = LoraConfig(
 model = get_peft_model(model, lora_config).to(device)
 
 model.train()
-tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
+tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
 
 def tokenize_function(example):
     query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")

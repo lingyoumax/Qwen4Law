@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from settings import num_negative_docs, retriever_modelname
+from settings import num_negative_docs, embedding_modelname
 
 max_length=100000
 
 df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
 
-tokenizer = AutoTokenizer.from_pretrained( retriever_modelname, padding_side='left')
+tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
 
 query_token_len= [len(tokenizer(d["query"], padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
 
@@ -59,4 +59,4 @@ plt.legend()
 plt.tight_layout()
 
 os.makedirs("Figs", exist_ok=True)
-plt.savefig('Figs/evalRetrieverTokenLength.jpg')
+plt.savefig('Figs/evalEmbeddingTokenLength.jpg')

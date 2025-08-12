@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 import torch.nn.functional as F
 import os
 
-from settings import num_negative_docs, device, embedding_max_length, random_seed, retriever_modelname, embedding_test_ratio, embedding_batch_size
+from settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
 from tools import last_token_pool, evaluateEmbeddingModel, drawEmbeddingLoss
 
 lr=1e-5
@@ -37,7 +37,7 @@ train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
 model = AutoModel.from_pretrained(
-    retriever_modelname,
+    embedding_modelname,
     device_map= device
 )
 for param in model.parameters():
@@ -51,7 +51,7 @@ for param in model.norm.parameters():
     param.requires_grad = True
 
 model.train()
-tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
+tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
 
 def tokenize_function(example):
     query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
