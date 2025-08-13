@@ -87,7 +87,7 @@ for i in tqdm(range(df.shape[0])):
         print(e)
         print(result)
         print()
-        break
+        continue
     
 columns = ["query", "doc", "answer"]
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
