@@ -33,7 +33,7 @@ lora_config = LoraConfig(
     target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
     lora_dropout=0.1,
     bias="none",
-    task_type=TaskType.FEATURE_EXTRACTION
+    task_type=TaskType.CAUSAL_LM
 )
 model = get_peft_model(model, lora_config).to(device)
 
