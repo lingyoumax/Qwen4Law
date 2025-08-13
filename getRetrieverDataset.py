@@ -119,5 +119,5 @@ for i in tqdm(range(df.shape[0])):
 columns = ["query", "positive_doc"]
 columns.extend([f"negative_doc{i}" for i in range(num_negative_docs)])
 
-RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
-RetrieverData_selfinstruct.to_csv("RetrieverDataset_selfinstruct.csv", index=False, encoding="utf-8-sig")
+RetrieverDataset = pd.DataFrame(data, columns=columns)
+RetrieverDataset.to_csv("RetrieverDataset.csv", index=False, encoding="utf-8-sig")

@@ -25,7 +25,7 @@ bnb_config = BitsAndBytesConfig(
     bnb_4bit_quant_type="nf4",
     bnb_4bit_compute_dtype=torch.float16,
 )
-model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-Reranker-0.6B", quantization_config=bnb_config,)
+model = AutoModelForCausalLM.from_pretrained(reranker_modelname, quantization_config=bnb_config,)
 model = prepare_model_for_kbit_training(model,gradient_checkpointing_kwargs={"use_reentrant":False})
 lora_config = LoraConfig(
     r=16,
@@ -50,7 +50,7 @@ def format_pair(instruction, query, doc):
         pair = "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(instruction=instruction,query=query, doc=doc)
     return prefix + pair + suffix
 
-df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {

@@ -19,7 +19,7 @@ savePath = "EmbeddingModel_Freeze"
 if not os.path.exists(savePath):
     os.mkdir(savePath)
 
-df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {

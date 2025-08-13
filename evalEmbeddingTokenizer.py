@@ -10,7 +10,7 @@ from settings import embedding_modelname
 directory='laws'
 fileend='.txt'
 
-files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]+["RetrieverQuery.txt"]
+files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]
 
 tk = AutoTokenizer.from_pretrained(embedding_modelname)
 special_tokens = tk.all_special_tokens

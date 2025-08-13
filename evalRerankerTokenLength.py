@@ -8,7 +8,7 @@ from settings import num_negative_docs, reranker_modelname
 
 max_length=100000
 
-df = pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 tokenizer = AutoTokenizer.from_pretrained( reranker_modelname, padding_side='left')
 
