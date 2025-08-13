@@ -62,7 +62,7 @@ def getPrompt(query, doc):
 在生成回答时，请遵循以下规则：
 1. 必须确保回答能准确覆盖文档的核心内容。
 2. 输出中只包含回答，不需要前缀、解释或格式说明。
-3. 模拟真实用户的自然语言习惯，使回答自然流畅。
+3. 必须模拟真实用户的自然语言习惯，使回答自然流畅。
 4. 如果有多个自然表达方式可以作为回答，请选择最常见或最自然的一种。
 5. 生成的回答必须要紧密联系文档内容。
 6. 禁止引入与文档不想关的背景信息或内容。
@@ -70,27 +70,25 @@ def getPrompt(query, doc):
     return prompt
 
 data=[]
-df=pd.read_csv("RetrieverDataset_selfinstruct_cleaned.csv").head(5)
+df=pd.read_csv("RetrieverDataset_cleaned.csv")
 
 for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
     query = row["query"]
     doc = row["positive_doc"]
     prompt=getPrompt(query, doc)
-    for j in range(1):
+    try:
         result = generate_with_qwen(prompt)
-        try:
-            result=clean_text(result)
-            d=[query, doc, result]
-            data.append(d)
-        except Exception as e:
-            print(e)
-            print(result)
-            print()
+        #result=clean_text(result)
+        d=[query, doc, result]
+        data.append(d)
+    except Exception as e:
+        print(i)
+        print(e)
+        print(result)
+        print()
+        break
     
-
-
 columns = ["query", "doc", "answer"]
-
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
 RetrieverData_selfinstruct.to_csv("LLMDataset.csv", index=False, encoding="utf-8-sig")
