@@ -20,23 +20,6 @@ def generate_with_qwen(prompt, model="qwen3-235b-a22b-instruct-2507"):
 
     return completion.choices[0].message.content
 
-def clean_text(text):
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    
-    text = re.sub(r'```json|```', '', text)
-    
-    text = text.strip()
-    
-    lines = text.splitlines()
-    last_line = lines[-1].strip() if lines else ''
-
-    if last_line.startswith('"') and last_line.endswith('"'):
-        last_line = last_line[1:-1]
-    elif last_line.startswith('“') and last_line.endswith('”'):
-        last_line = last_line[1:-1]
-    
-    return last_line
-
 def getPrompt(query, doc):
     prompt=f"""
 你的任务是根据用户的提问和相关文档回答问题，该回答应能准确对应到文档内容，并避免引入不想关内容。请生成符合人类自然搜索习惯的回答。
