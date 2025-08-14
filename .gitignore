@@ -10,4 +10,5 @@ EmbeddingModel_Full/
 EmbeddingModel_QLoRA/
 EmbeddingModel_Freeze/
 RerankerModel_QLoRA/
+LLMModel_SFT/
 laws/
