@@ -145,6 +145,28 @@ def evaluateRerankerModel(model, dataloader, token_true_id , token_false_id):
     model.train()
     return l/total if total > 0 else 0
 
+def evaluateTrainedRerankerModel(model, dataloader, token_true_id , token_false_id):
+    # 计算模型在测试集上的平均Score
+    model.eval()
+    score = 0
+    total = 0
+    with torch.inference_mode():
+        for batch in tqdm(dataloader):
+            positive_pair_dict=BatchEncoding({"input_ids":batch["positive_pair_input_ids"],"attention_mask":batch["positive_pair_attention_mask"]})
+            s = computeRerankerScore(model, positive_pair_dict, token_true_id, token_false_id).exp()
+        
+            for i in range(num_negative_docs):
+                negative_pair_dict_i=BatchEncoding({"input_ids":batch[f"negative_pair_input_ids_{i}"],"attention_mask":batch[f"negative_pair_attention_mask_{i}"]})
+                negative_pair_score_i = computeRerankerScore(model, negative_pair_dict_i, token_true_id, token_false_id, 1)
+                s = s + negative_pair_score_i.exp()
+        
+            score = score + torch.sum(s/torch.tensor(1+num_negative_docs)).item()
+            B = s.size(0)
+            total = total + B
+
+    model.train()
+    return score/total if total > 0 else 0
+
 def drawLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))
 
