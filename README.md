@@ -37,9 +37,13 @@ $$margin = sim(q,d^+)-max_i(sim(q,d_i^-))$$
 |Model|GPU Memory Usage(MiB) while Training|Margin on Test Set|
 |---|---|---|
 |Base Model|-| 0.4380992329120636 |
-|Freeze|19096|0.6184983235597611| 
+|Freeze|19096| 0.6184983235597611 | 
 |QLoRA|4686| 0.7048807286024094 | 
 
+Freeze微调训练过程中的Loss曲线：
+![EmbeddingModel_Freeze](Figs/EmbeddingModel_Freeze.svg)
+QLoRA微调训练过程中的Loss曲线：
+![EmbeddingModel_QLoRA](Figs/EmbeddingModel_QLoRA.svg)
 
 # 过程中的思考：
 
