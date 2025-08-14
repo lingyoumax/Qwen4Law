@@ -13,6 +13,7 @@
 - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
 - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，在权衡了GPU的推理速度和时间之后，将子集的大小设置为10000。
 - 数据生成：随机选取chunk作为正例样本，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
+- 数据清理：删除了其中正例文档为空的数据，以及对为空的负例文档使用其它文档作了替换，实际得到的数据集大小为9999。
 
 ### Tokenizer
 
@@ -40,8 +41,10 @@
 
 统一使用Qwen3-Reranker-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
 
-- Freeze微调：全参数微调模型中最后四层的layers和归一化层
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
+## LLM Model
+### 数据集
+- 数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9997）
 
 # 结果及分析
 
@@ -61,7 +64,7 @@ QLoRA微调训练过程中的Loss曲线：
 ![EmbeddingModel_QLoRA](Figs/EmbeddingModel_QLoRA.svg)
 
 ## Reranker Model
-在微调前，模型的平均得分已经达到了0.999，且训练过程中loss只是稍微下降，所以认为该模型并不需要微调。
+在微调前，模型的平均得分已经达到了0.9946536738872528，且训练过程中loss只是下降幅度不明显，所以认为该模型并不需要微调。
 
 $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
