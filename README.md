@@ -4,7 +4,7 @@
 
 # 技术路线
 
-## Retriever
+## Embedding Model
 
 ### 数据集
 
@@ -21,9 +21,24 @@
 数据集中的query， postive_doc， negative_doc在现有的的tokenizer下对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512。
 ![evalEmbeddingTokenLength](Figs/evalEmbeddingTokenLength.jpg)
 
-### Embedding 模型
+### Model
 
 统一使用Qwen3-Embedding-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
+
+- Freeze微调：全参数微调模型中最后四层的layers和归一化层
+- QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
+
+## Reranker Model
+### 数据集
+使用微调Embedding模型的数据集
+### Tokenizer
+同样使用了预训练模型自带的tokenizer。
+
+如下图所示，同样分析了输入的(query,doc)对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为512。
+![evalRerankerTokenLength](Figs/evalRerankerTokenLength.jpg)
+### Model
+
+统一使用Qwen3-Reranker-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
 
 - Freeze微调：全参数微调模型中最后四层的layers和归一化层
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
@@ -44,6 +59,11 @@ Freeze微调训练过程中的Loss曲线：
 ![EmbeddingModel_Freeze](Figs/EmbeddingModel_Freeze.svg)
 QLoRA微调训练过程中的Loss曲线：
 ![EmbeddingModel_QLoRA](Figs/EmbeddingModel_QLoRA.svg)
+
+## Reranker Model
+在微调前，模型的平均得分已经达到了0.999，且训练过程中loss只是稍微下降，所以认为该模型并不需要微调。
+
+$$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
 # 过程中的思考：
 
