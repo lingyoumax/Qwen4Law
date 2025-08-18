@@ -1,8 +1,6 @@
 import pandas as pd
 import torch
 import os
-from tqdm.auto import tqdm
-from transformers import BatchEncoding
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from modelscope import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
