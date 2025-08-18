@@ -5,12 +5,12 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from settings import device, retriever_modelname
+from settings import device, embedding_modelname
 
 qwen_max_length=8192
 
-tokenizer = AutoTokenizer.from_pretrained(retriever_modelname, padding_side='left')
-model = AutoModel.from_pretrained(retriever_modelname)
+tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
+model = AutoModel.from_pretrained(embedding_modelname)
 
 model = model.to(device)
 model.eval()
@@ -53,6 +53,7 @@ def generate_all_embeddings(text_list, batch_size=4):
     final_embeddings = np.vstack(all_embeddings)
     return final_embeddings
 
+@torch.no_grad()
 def max_min_diverse_subset(text_list, embeddings, k=7000):
     embeddings_tensor = torch.tensor(embeddings, device=device)
     embeddings_normalized = embeddings_tensor / torch.norm(embeddings_tensor, dim=1, keepdim=True)

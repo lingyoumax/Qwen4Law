@@ -1,10 +1,7 @@
 from openai import OpenAI
 import config
 import pandas as pd
-import random
 from tqdm import tqdm
-import re
-from settings import num_negative_docs
 client = OpenAI(
     api_key=config.api_key,
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
