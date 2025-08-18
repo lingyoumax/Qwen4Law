@@ -39,12 +39,20 @@ def max_min_diverse_subset(text_list, embeddings_normalized, k=7000):
     return selected_indices
 
 @torch.no_grad()
-def min_cosine_dist_by_chunks_A(A: torch.Tensor,
-                                B: torch.Tensor,
-                                a_batch: int = 2048,
-                                use_half: bool = False) -> torch.Tensor:
-
+def min_cosine_dist(
+    A: torch.Tensor,
+    B: torch.Tensor,
+    a_batch: int = 2048,
+    b_batch: int = 2048,
+    use_half: bool = False,
+) -> torch.Tensor:
+    """
+    返回与 torch.min(1 - A @ B.T, dim=1).values 等价的 [N] 张量，
+    但对 A 和 B 都分块以节省显存。假设 A、B 已做 L2 归一化。
+    """
     device = A.device
+
+    # 可选半精度
     if use_half and device.type == "cuda":
         A_work = A.half()
         B_work = B.half()
@@ -53,20 +61,30 @@ def min_cosine_dist_by_chunks_A(A: torch.Tensor,
         B_work = B
 
     N = A_work.size(0)
-    mins_list = []
-    BT = B_work.transpose(0, 1)
+    mins_all = []
 
     for i in range(0, N, a_batch):
-        Ai = A_work[i:i + a_batch] 
-        sim_blk = Ai @ BT 
-        dist_blk = 1.0 - sim_blk
-        mins_i = dist_blk.min(dim=1).values 
-        mins_list.append(mins_i.to(A.dtype)) # 转回原 dtype
-        # 释放临时引用
-        del Ai, sim_blk, dist_blk, mins_i
+        Ai = A_work[i:i + a_batch]  # [a, D]
+        # 当前 A 批次的最小距离，初始为 +inf
+        mins_i = torch.full((Ai.size(0),), float("inf"),
+                            device=device, dtype=Ai.dtype)
 
-    mins = torch.cat(mins_list, dim=0)       # [N]
-    del mins_list, BT
+        # 遍历 B 的分块，逐块更新最小值
+        for j in range(0, B_work.size(0), b_batch):
+            Bj = B_work[j:j + b_batch]            # [b, D]
+            sim = Ai @ Bj.transpose(0, 1)         # [a, b]
+            dist = 1.0 - sim                      # 余弦距离
+            blk_min = dist.min(dim=1).values      # [a]
+            mins_i = torch.minimum(mins_i, blk_min)
+
+            # 释放临时引用
+            del Bj, sim, dist, blk_min
+
+        mins_all.append(mins_i.to(A.dtype))
+        del Ai, mins_i
+
+    mins = torch.cat(mins_all, dim=0)  # [N]
+    del mins_all
     return mins
 
 df = pd.read_csv("Laws_All.csv")
@@ -76,14 +94,16 @@ embeddings=np.load("Laws_Embeddings.npy")
 embeddings = torch.tensor(embeddings, device=device, requires_grad=False)
 embeddings = embeddings / torch.norm(embeddings, dim=1, keepdim=True)
 
+N = embeddings.size(0)   
 nums_selected=[]
 dist=[]
-for n in range(1000,20001,1000):
+for n in range(1000,10001,1000):
     indices=max_min_diverse_subset(text_list, embeddings, n)
+    mask = torch.ones(N, dtype=torch.bool, device=embeddings.device)
+    mask[indices] = False                 # 选中的设为 False
+    embeddings_unselected = embeddings[mask] 
     embeddings_selected = embeddings[indices,:]
-    chamfer_dists = min_cosine_dist_by_chunks_A(embeddings, embeddings_selected,
-                                   a_batch=2048, use_half=False)
-    chamfer_dist= torch.mean(chamfer_dists).item()
+    chamfer_dist= (torch.mean(min_cosine_dist(embeddings_selected, embeddings_unselected)).item() + torch.mean(min_cosine_dist(embeddings_unselected, embeddings_selected)).item())/2
     nums_selected.append(n)
     dist.append(chamfer_dist)
 
@@ -92,7 +112,7 @@ plt.plot(nums_selected, dist, marker="o", linestyle="-", linewidth=2, markersize
 
 plt.title("Chamfer Distance vs. Number of Selected Samples", fontsize=14)
 plt.xlabel("Number of Selected Samples", fontsize=12)
-plt.ylabel("Chamfer Distance (All→Selected, cosine)", fontsize=12)
+plt.ylabel("Chamfer Distance (cosine)", fontsize=12)
 
 plt.grid(True, linestyle="--", alpha=0.6)
 plt.tight_layout()
