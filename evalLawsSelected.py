@@ -38,6 +38,37 @@ def max_min_diverse_subset(text_list, embeddings_normalized, k=7000):
 
     return selected_indices
 
+@torch.no_grad()
+def min_cosine_dist_by_chunks_A(A: torch.Tensor,
+                                B: torch.Tensor,
+                                a_batch: int = 2048,
+                                use_half: bool = False) -> torch.Tensor:
+
+    device = A.device
+    if use_half and device.type == "cuda":
+        A_work = A.half()
+        B_work = B.half()
+    else:
+        A_work = A
+        B_work = B
+
+    N = A_work.size(0)
+    mins_list = []
+    BT = B_work.transpose(0, 1)
+
+    for i in range(0, N, a_batch):
+        Ai = A_work[i:i + a_batch] 
+        sim_blk = Ai @ BT 
+        dist_blk = 1.0 - sim_blk
+        mins_i = dist_blk.min(dim=1).values 
+        mins_list.append(mins_i.to(A.dtype)) # 转回原 dtype
+        # 释放临时引用
+        del Ai, sim_blk, dist_blk, mins_i
+
+    mins = torch.cat(mins_list, dim=0)       # [N]
+    del mins_list, BT
+    return mins
+
 df = pd.read_csv("Laws_All.csv")
 text_list = df["内容"].tolist()
 
@@ -50,7 +81,8 @@ dist=[]
 for n in range(1000,20001,1000):
     indices=max_min_diverse_subset(text_list, embeddings, n)
     embeddings_selected = embeddings[indices,:]
-    chamfer_dists = torch.min(1 - embeddings @ embeddings_selected.T, dim=1).values
+    chamfer_dists = min_cosine_dist_by_chunks_A(embeddings, embeddings_selected,
+                                   a_batch=2048, use_half=False)
     chamfer_dist= torch.mean(chamfer_dists).item()
     nums_selected.append(n)
     dist.append(chamfer_dist)
