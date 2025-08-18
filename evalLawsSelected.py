@@ -64,26 +64,23 @@ def min_cosine_dist(
     mins_all = []
 
     for i in range(0, N, a_batch):
-        Ai = A_work[i:i + a_batch]  # [a, D]
-        # 当前 A 批次的最小距离，初始为 +inf
+        Ai = A_work[i:i + a_batch]
         mins_i = torch.full((Ai.size(0),), float("inf"),
                             device=device, dtype=Ai.dtype)
 
-        # 遍历 B 的分块，逐块更新最小值
         for j in range(0, B_work.size(0), b_batch):
-            Bj = B_work[j:j + b_batch]            # [b, D]
-            sim = Ai @ Bj.transpose(0, 1)         # [a, b]
-            dist = 1.0 - sim                      # 余弦距离
-            blk_min = dist.min(dim=1).values      # [a]
+            Bj = B_work[j:j + b_batch]
+            sim = Ai @ Bj.transpose(0, 1) 
+            dist = 1.0 - sim 
+            blk_min = dist.min(dim=1).values
             mins_i = torch.minimum(mins_i, blk_min)
 
-            # 释放临时引用
             del Bj, sim, dist, blk_min
 
         mins_all.append(mins_i.to(A.dtype))
         del Ai, mins_i
 
-    mins = torch.cat(mins_all, dim=0)  # [N]
+    mins = torch.cat(mins_all, dim=0)
     del mins_all
     return mins
 
@@ -97,10 +94,10 @@ embeddings = embeddings / torch.norm(embeddings, dim=1, keepdim=True)
 N = embeddings.size(0)   
 nums_selected=[]
 dist=[]
-for n in range(1000,10001,1000):
+for n in range(1000,100001,1000):
     indices=max_min_diverse_subset(text_list, embeddings, n)
     mask = torch.ones(N, dtype=torch.bool, device=embeddings.device)
-    mask[indices] = False                 # 选中的设为 False
+    mask[indices] = False 
     embeddings_unselected = embeddings[mask] 
     embeddings_selected = embeddings[indices,:]
     chamfer_dist= (torch.mean(min_cosine_dist(embeddings_selected, embeddings_unselected)).item() + torch.mean(min_cosine_dist(embeddings_unselected, embeddings_selected)).item())/2
