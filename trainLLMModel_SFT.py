@@ -34,7 +34,7 @@ train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
 # ============ Tokenizer ============
-tokenizer = AutoTokenizer.from_pretrained(llm_modelname, use_fast=False)
+tokenizer = AutoTokenizer.from_pretrained(llm_modelname)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -124,4 +124,3 @@ trainer.train()
 
 # ============ 保存模型 ============
 model.save_pretrained(savePath)
-tokenizer.save_pretrained(savePath)
