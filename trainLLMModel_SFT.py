@@ -105,7 +105,7 @@ training_args = TrainingArguments(
     num_train_epochs=n_epoch,
     logging_steps=50,
     save_strategy="epoch",
-    evaluation_strategy="epoch",
+    eval_strategy="epoch",
     fp16=True,
     report_to="none",
 )
