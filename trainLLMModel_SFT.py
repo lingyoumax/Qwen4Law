@@ -107,7 +107,7 @@ training_args = TrainingArguments(
     save_strategy="epoch",
     eval_strategy="epoch",
     fp16=True,
-    report_to="none",
+    report_to="tensorboard",
 )
 
 # ============ Trainer ============
