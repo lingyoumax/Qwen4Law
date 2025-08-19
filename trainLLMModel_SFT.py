@@ -6,7 +6,7 @@ from transformers import DataCollatorForSeq2Seq, BitsAndBytesConfig, TrainingArg
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 from modelscope import AutoModelForCausalLM, AutoTokenizer
 
-from settings import llm_modelname, device, random_seed, llm_test_ratio, llm_batch_size
+from settings import llm_modelname, device, random_seed, llm_test_ratio, llm_batch_size, llm_max_length
 
 # ============ 超参数 ============
 lr = 1e-5
@@ -40,18 +40,18 @@ if tokenizer.pad_token is None:
 
 def preprocess_batch(batch):
     """把 question + reference 拼接作为输入，answer 作为标签"""
-    inputs = [f"Question: {q}\nReference: {r}\nAnswer:" for q, r in zip(batch["question"], batch["reference"])]
+    inputs = [f"<Question>: {q}\n<Reference>: {r}\n<Answer>:" for q, r in zip(batch["question"], batch["reference"])]
     targets = batch["answer"]
 
     model_inputs = tokenizer(
         inputs,
-        max_length=512,
+        max_length=llm_max_length,
         truncation=True,
         padding="max_length"
     )
     labels = tokenizer(
         targets,
-        max_length=512,
+        max_length=llm_max_length,
         truncation=True,
         padding="max_length"
     )

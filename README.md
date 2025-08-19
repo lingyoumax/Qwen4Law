@@ -25,7 +25,7 @@
 
 ### Model
 
-统一使用Qwen3-Embedding-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
+使用Qwen3-Embedding-0.6B架构，分别采取以下技术路线进行对比实验：
 
 - Freeze微调：全参数微调模型中最后四层的layers和归一化层
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
@@ -40,13 +40,22 @@
 ![evalRerankerTokenLength](Figs/evalRerankerTokenLength.jpg)
 ### Model
 
-统一使用Qwen3-Reranker-0.6B架构[^1]，分别采取以下技术路线进行对比实验：
+使用Qwen3-Reranker-0.6B架构，采取以下技术路线进行对比实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 ## LLM Model
 ### 数据集
 - 数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9997）
+### Tokenizer
+同样使用了预训练模型自带的tokenizer。
 
+如下图所示，同样分析了输入的(query,doc)对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为512。
+![evalLLMTokenLength](Figs/evalLLMTokenLength.jpg)
+### Model
+
+使用Qwen3-8B架构，采取以下技术路线进行对比实验：
+
+- QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 # 结果及分析
 
 ## Embedding Model
@@ -164,11 +173,18 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 - 之前使用recall@1去评估微调后的Embedding模型在测试集上的性能，但是发现即使没有微调的模型在测试集上的Recall@1也是0.9995，之后即使微调了，也没有变化。所以更改为使用和Training的Loss一样的指标评估。
 
 # 参考文献
-
-[^1]: ```bibtex
-    @article{qwen3embedding,
+ ```bibtex
+@article{qwen3embedding,
     title={Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
     author={Zhang, Yanzhao and Li, Mingxin and Long, Dingkun and Zhang, Xin and Lin, Huan and Yang, Baosong and Xie, Pengjun and Yang, An and Liu, Dayiheng and Lin, Junyang and Huang, Fei and Zhou, Jingren},
     journal={arXiv preprint arXiv:2506.05176},
     year={2025}
-    }
+}
+
+@article{qwen3,
+    title={Qwen3 Technical Report}, 
+    author={An Yang and Anfeng Li and Baosong Yang and Beichen Zhang and Binyuan Hui and Bo Zheng and Bowen Yu and Chang Gao and Chengen Huang and Chenxu Lv and Chujie Zheng and Dayiheng Liu and Fan Zhou and Fei Huang and Feng Hu and Hao Ge and Haoran Wei and Huan Lin and Jialong Tang and Jian Yang and Jianhong Tu and Jianwei Zhang and Jianxin Yang and Jiaxi Yang and Jing Zhou and Jingren Zhou and Junyang Lin and Kai Dang and Keqin Bao and Kexin Yang and Le Yu and Lianghao Deng and Mei Li and Mingfeng Xue and Mingze Li and Pei Zhang and Peng Wang and Qin Zhu and Rui Men and Ruize Gao and Shixuan Liu and Shuang Luo and Tianhao Li and Tianyi Tang and Wenbiao Yin and Xingzhang Ren and Xinyu Wang and Xinyu Zhang and Xuancheng Ren and Yang Fan and Yang Su and Yichang Zhang and Yinger Zhang and Yu Wan and Yuqiong Liu and Zekun Wang and Zeyu Cui and Zhenru Zhang and Zhipeng Zhou and Zihan Qiu},
+    journal = {arXiv preprint arXiv:2505.09388},
+    year={2025}
+}
+```
