@@ -85,7 +85,7 @@ model = prepare_model_for_kbit_training(model)
 # ============ LoRA 配置 ============
 lora_config = LoraConfig(
     task_type=TaskType.CAUSAL_LM,
-    target_modules=["q_proj", "v_proj"],  # 常见设置，可以根据模型调整
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],  # 常见设置，可以根据模型调整
     r=8,
     lora_alpha=32,
     lora_dropout=0.1,
