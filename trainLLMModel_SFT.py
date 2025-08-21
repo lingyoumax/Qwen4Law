@@ -2,7 +2,8 @@ import os
 import torch
 import pandas as pd
 from datasets import Dataset
-from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorForSeq2Seq, BitsAndBytesConfig, TrainingArguments, Trainer
+from modelscope import AutoTokenizer, AutoModelForCausalLM
+from transformers import DataCollatorForSeq2Seq, BitsAndBytesConfig, TrainingArguments, Trainer
 
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 from settings import llm_modelname, random_seed, llm_test_ratio, llm_batch_size, llm_max_length
@@ -17,7 +18,7 @@ os.makedirs(savePath, exist_ok=True)
 df = pd.read_csv("LLMDataset_SFT.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
-    query=f"Based on the content:{row['doc']}\nAnswer the Question:{row["query"]}\n/no_think"
+    query=f"Based on the content:{row['doc']}\nAnswer the Question:{row['query']}\n/no_think"
     return {
         "input": query,
         "output": row["answer"]
@@ -67,24 +68,32 @@ def preprocess_batch(batch):
         return_tensors=None
     )
     # ===== 截断策略：从左侧截断，尽量保留答案段 =====
+    pad_len = 0
     if len(full_ids) > llm_max_length:
         full_trunc = full_ids[-llm_max_length:]
     else:
-        full_trunc = full_ids
+        pad_len = (llm_max_length - len(full_ids))
+        full_trunc = full_ids + [tokenizer.pad_token_id] * pad_len
 
     # 计算截断后有效的 prompt 长度（需要把被左截断的部分扣除）
     p_len_orig = len(prompt_ids)
-    trunc_offset = len(full_ids)    - len(full_trunc)
+    trunc_offset = max(0, len(full_ids) - llm_max_length)
     p_len_eff = max(0, p_len_orig - trunc_offset)
+
+    attention_mask = [1]*len(full_trunc)
 
     # 构造 labels：prompt 段 -100，答案段监督
     labels = full_trunc.copy()
     labels[:p_len_eff] = [IGNORE_INDEX] * p_len_eff
 
+    if pad_len:
+        attention_mask[-pad_len:] = [0] * pad_len
+        labels[-pad_len:] = [IGNORE_INDEX] * pad_len
+
 
     return {
         "input_ids": full_trunc,
-        "attention_mask": [1] * len(full_trunc),
+        "attention_mask": attention_mask,
         "labels": labels
     }
 
