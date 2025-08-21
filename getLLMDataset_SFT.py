@@ -71,4 +71,4 @@ for i in tqdm(range(df.shape[0])):
     
 columns = ["query", "doc", "answer"]
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
-RetrieverData_selfinstruct.to_csv("LLMDataset.csv", index=False, encoding="utf-8-sig")
+RetrieverData_selfinstruct.to_csv("LLMDataset_SFT.csv", index=False, encoding="utf-8-sig")

@@ -49,7 +49,7 @@
 ### Tokenizer
 同样使用了预训练模型自带的tokenizer。
 
-如下图所示，同样分析了输入的(query,doc)对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为512。
+如下图所示，同样分析了输入对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为512。
 ![evalLLMTokenLength](Figs/evalLLMTokenLength.jpg)
 ### Model
 
