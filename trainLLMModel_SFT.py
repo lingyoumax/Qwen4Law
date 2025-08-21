@@ -17,10 +17,9 @@ os.makedirs(savePath, exist_ok=True)
 df = pd.read_csv("LLMDataset_SFT.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
-    # 你给的结构：instruction 放了参考文档，input 是 query，output 是答案
+    query=f"Based on the content:{row['doc']}\nAnswer the Question:{row["query"]}\n/no_think"
     return {
-        "instruction": f"Please answer based on the reference.\n{row['doc']}",
-        "input": row["query"],
+        "input": query,
         "output": row["answer"]
     }
 
@@ -46,7 +45,6 @@ def preprocess_batch(batch):
 
     # 仅包含 system+user，用于计算 prompt 长度（assistant 开始处）
     messages_prompt = [
-        {"role": "system", "content": batch["instruction"]},
         {"role": "user", "content": batch["input"]}
     ]
     # 完整样本，包含 assistant 的答案

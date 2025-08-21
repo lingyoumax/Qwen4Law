@@ -13,13 +13,8 @@ df = pd.read_csv("LLMDataset_SFT.csv", encoding="utf-8-sig")
 tokenizer = AutoTokenizer.from_pretrained(llm_modelname)
 
 def format_messages(question, reference, answer):
-    instruction = f"Please answer based on the reference.\n{reference}"
-    messages = [
-        {"role": "system", "content": instruction},
-        {"role": "user", "content": question},
-        {"role": "assistant", "content": answer}
-    ]
-    return messages
+    query=f"Based on the content:{reference}\nAnswer the Question:{question}\n/no_think"
+    return [{"role": "user", "content": query}, {"role": "assistant", "content": answer}]
 
 messages_token_len = []
 
