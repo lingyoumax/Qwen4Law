@@ -97,8 +97,8 @@ def preprocess_batch(batch):
         "labels": labels
     }
 
-tokenized_train = train_dataset.map(preprocess_batch, batched=True, remove_columns=train_dataset.column_names)
-tokenized_test  = test_dataset.map(preprocess_batch,  batched=True, remove_columns=test_dataset.column_names)
+tokenized_train = train_dataset.map(preprocess_batch, remove_columns=train_dataset.column_names)
+tokenized_test  = test_dataset.map(preprocess_batch, remove_columns=test_dataset.column_names)
 
 # ============ 模型加载（4bit 量化 QLoRA） ============
 bnb_config = BitsAndBytesConfig(
