@@ -6,7 +6,7 @@ from transformers import DataCollatorForSeq2Seq, BitsAndBytesConfig, TrainingArg
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 from modelscope import AutoModelForCausalLM, AutoTokenizer
 
-from settings import llm_modelname, device, random_seed, llm_test_ratio, llm_batch_size, llm_max_length
+from settings import llm_modelname, random_seed, llm_test_ratio, llm_batch_size, llm_max_length
 
 # ============ 超参数 ============
 lr = 1e-5
@@ -73,7 +73,7 @@ bnb_config = BitsAndBytesConfig(
 model = AutoModelForCausalLM.from_pretrained(
     llm_modelname,
     quantization_config=bnb_config,
-    device_map=device,
+    device_map="auto",
     trust_remote_code=True
 )
 
@@ -112,7 +112,7 @@ training_args = TrainingArguments(
 
 # ============ Trainer ============
 trainer = Trainer(
-    model=model.to(device),
+    model=model,
     args=training_args,
     train_dataset=tokenized_train,
     eval_dataset=tokenized_test,
