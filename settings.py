@@ -12,6 +12,6 @@ embedding_test_ratio = 0.2
 reranker_max_length = 512
 reranker_batch_size = 4
 reranker_test_ratio = 0.2
-llm_max_length = 512
+llm_max_length = 1024
 llm_batch_size=4
 llm_test_ratio = 0.2
