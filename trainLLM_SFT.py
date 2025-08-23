@@ -10,7 +10,7 @@ from settings import llm_modelname, random_seed, llm_test_ratio, llm_batch_size,
 
 lr = 1e-5
 n_epoch = 10
-savePath = "LLMModel_SFT"
+savePath = "LLM_SFT"
 os.makedirs(savePath, exist_ok=True)
 
 df = pd.read_csv("LLMDataset_SFT.csv", encoding="utf-8-sig")
