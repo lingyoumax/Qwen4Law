@@ -12,3 +12,4 @@ EmbeddingModel_Freeze/
 RerankerModel_QLoRA/
 LLM_SFT/
 laws/
+bert-base-chinese

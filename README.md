@@ -45,7 +45,7 @@
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 ## LLM Model
 ### 数据集
-- 数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9997）
+- 数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）
 ### Tokenizer
 同样使用了预训练模型自带的tokenizer。
 
@@ -177,7 +177,11 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
 ## 20250821
 
--SFT微调LLM时，没有考虑chat template，导致之前的训练无效。
+- SFT微调LLM时，没有考虑chat template，导致之前的训练无效。
+
+## 20250823
+
+- SFT微调的指令格式和self instruct不一致，导致需要重新生成数据集
 
 # 参考文献
  ```bibtex
