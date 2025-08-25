@@ -162,7 +162,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         loss.backward()
         optimizer.step()
         trainloss=trainloss+loss.item()
-    # === Evaluate ===
+
     trainloss=trainloss/len(train_dataloader)
     testloss = evaluateEmbeddingModel(model, test_dataloader, temperature)
     tqdm.write(f"Epoch {epoch}: Training Loss = {trainloss:.4f}, Test loss = {testloss:.4f}")

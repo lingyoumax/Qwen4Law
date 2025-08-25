@@ -6,10 +6,10 @@ from tqdm import tqdm
 
 def is_chinese_char_or_punct(ch):
     return (
-        '\u4e00' <= ch <= '\u9fff' or  # 中文字符
-        '\u3000' <= ch <= '\u303f' or  # 中文标点符号
-        ch.isdigit() or                # 阿拉伯数字（0-9）
-        ch == ' '  or                    # 空格
+        '\u4e00' <= ch <= '\u9fff' or
+        '\u3000' <= ch <= '\u303f' or
+        ch.isdigit() or 
+        ch == ' '  or 
         ch in " （）【】：；“”‘’\"\'<>，。,.、/！"
     )
 

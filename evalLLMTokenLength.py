@@ -24,7 +24,7 @@ for _, d in df.iterrows():
         messages,
         tokenize=True,
         add_generation_prompt=False,
-        enable_thinking=False,        # 训练禁用思维模式
+        enable_thinking=False,
         return_tensors=None
     )
     messages_token_len.append(len(prompt_ids))

@@ -46,10 +46,6 @@ def min_cosine_dist(
     b_batch: int = 2048,
     use_half: bool = False,
 ) -> torch.Tensor:
-    """
-    返回与 torch.min(1 - A @ B.T, dim=1).values 等价的 [N] 张量，
-    但对 A 和 B 都分块以节省显存。假设 A、B 已做 L2 归一化。
-    """
     device = A.device
 
     # 可选半精度
