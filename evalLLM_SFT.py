@@ -100,4 +100,4 @@ plt.xlabel('F1')
 plt.ylabel('Count')
 plt.legend(loc="upper left")
 
-plt.savefig("evalLLM_SFT.svg")
+plt.savefig("Figs/evalLLM_SFT.svg")
