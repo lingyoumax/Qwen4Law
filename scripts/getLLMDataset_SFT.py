@@ -1,10 +1,12 @@
 from openai import OpenAI
-import config
 import pandas as pd
 from tqdm import tqdm
+
+from .config import API_KEY, BASE_URL
+
 client = OpenAI(
-    api_key=config.api_key,
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=API_KEY,
+    base_url=BASE_URL,
 )
 
 def generate_with_qwen(prompt, model="qwen3-235b-a22b-instruct-2507"):
@@ -50,7 +52,7 @@ def getPrompt(query, doc):
     return prompt
 
 data=[]
-df=pd.read_csv("RetrieverDataset_cleaned.csv")
+df=pd.read_csv("data/RetrieverDataset_cleaned.csv")
 
 for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
@@ -71,4 +73,4 @@ for i in tqdm(range(df.shape[0])):
     
 columns = ["query", "doc", "answer"]
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
-RetrieverData_selfinstruct.to_csv("LLMDataset_SFT.csv", index=False, encoding="utf-8-sig")
+RetrieverData_selfinstruct.to_csv("data/LLMDataset_SFT.csv", index=False, encoding="utf-8-sig")

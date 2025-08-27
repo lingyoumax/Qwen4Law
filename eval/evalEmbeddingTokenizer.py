@@ -4,10 +4,10 @@ from modelscope import AutoTokenizer
 import os
 from tqdm import tqdm
 
-from tools import getFiles
-from settings import embedding_modelname
+from scripts.tools import getFiles
+from scripts.settings import embedding_modelname
 
-directory='laws'
+directory='data/laws'
 fileend='.txt'
 
 files=[f"{directory}/{f}{fileend}" for f in getFiles(directory, fileend)]
@@ -47,5 +47,5 @@ plt.ylabel('Mean # of Tokens per Line')
 plt.title('Effect of Vocab Size on Tokenization')
 plt.grid(True)
 
-os.makedirs("Figs", exist_ok=True)
-plt.savefig('Figs/evalTokenizer.jpg')
+os.makedirs("figs", exist_ok=True)
+plt.savefig('figs/evalTokenizer.jpg')

@@ -4,10 +4,10 @@ from modelscope import AutoModel, AutoTokenizer
 import torch
 from torch.utils.data import DataLoader
 
-from settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
-from tools import evaluateTrainedEmbeddingModel
+from scripts.settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
+from scripts.tools import evaluateTrainedEmbeddingModel
 
-df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
@@ -27,8 +27,7 @@ model = AutoModel.from_pretrained(
     embedding_modelname,
     device_map= device
 )
-state_dict = torch.load("EmbeddingModel_Freeze/EmbeddingModel_Freeze_Best.pth", map_location=device)
-model.load_state_dict(state_dict)
+
 model.eval()
 tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
 

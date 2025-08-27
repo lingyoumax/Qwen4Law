@@ -6,9 +6,9 @@ import os
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 
-from settings import device, num_negative_docs
+from .settings import device, num_negative_docs
 
-def getFiles(directory='laws', fileend='.txt'):
+def getFiles(directory='data/laws', fileend='.txt'):
     # 获取文件夹下指定后缀的所有文件的文件名
     txt_files = []
     for filename in os.listdir(directory):
@@ -180,4 +180,4 @@ def drawLoss(saveName, TrainLoss, TestLoss):
     plt.xlabel('Epoch')
     plt.ylabel("Loss of Test Set")
 
-    plt.savefig(f"Figs/{saveName}.svg")
+    plt.savefig(f"figs/{saveName}.svg")

@@ -18,7 +18,7 @@ def cleanText(text):
     cleaned_text = ''.join(filtered_text)
     return cleaned_text
 
-directory='laws'
+directory='data/laws'
 fileend='.pdf'
 
 laws=getFiles(directory, fileend)
@@ -165,4 +165,4 @@ for file in tqdm(csv_files):
     dfs.append(pd.read_csv(file))
 df = pd.concat(dfs, ignore_index=True)
 
-df.to_csv(f"Laws_All.csv", index=False, encoding="utf-8-sig")
+df.to_csv(f"data/Laws_All.csv", index=False, encoding="utf-8-sig")

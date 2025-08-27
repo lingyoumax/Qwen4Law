@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from settings import device
+from scripts.settings import device
 
 @torch.no_grad()
 def max_min_diverse_subset(text_list, embeddings_normalized, k=7000):
@@ -80,10 +80,10 @@ def min_cosine_dist(
     del mins_all
     return mins
 
-df = pd.read_csv("Laws_All.csv")
+df = pd.read_csv("data/Laws_All.csv")
 text_list = df["内容"].tolist()
 
-embeddings=np.load("Laws_Embeddings.npy")
+embeddings=np.load("data/Laws_Embeddings.npy")
 embeddings = torch.tensor(embeddings, device=device, requires_grad=False)
 embeddings = embeddings / torch.norm(embeddings, dim=1, keepdim=True)
 
@@ -109,4 +109,4 @@ plt.ylabel("Chamfer Distance (cosine)", fontsize=12)
 
 plt.grid(True, linestyle="--", alpha=0.6)
 plt.tight_layout()
-plt.savefig("Figs/evalLawsSelected.svg")
+plt.savefig("figs/evalLawsSelected.svg")

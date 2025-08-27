@@ -1,13 +1,15 @@
 from datasets import Dataset
 import pandas as pd
+from peft import PeftModel
 from modelscope import AutoModel, AutoTokenizer
 import torch
 from torch.utils.data import DataLoader
 
-from settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
-from tools import evaluateTrainedEmbeddingModel
+from scripts.settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
+from scripts.tools import evaluateTrainedEmbeddingModel
 
-df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
+adapter_path = "weight/EmbeddingModel_QLoRA"
+df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
@@ -27,6 +29,7 @@ model = AutoModel.from_pretrained(
     embedding_modelname,
     device_map= device
 )
+model = PeftModel.from_pretrained(model, adapter_path)
 
 model.eval()
 tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')

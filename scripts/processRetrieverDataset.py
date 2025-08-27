@@ -3,7 +3,7 @@ import numpy as np
 
 from settings import num_negative_docs
 
-df = pd.read_csv("RetrieverDataset.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/RetrieverDataset.csv", encoding="utf-8-sig")
 
 df = df.dropna(subset=['positive_doc'])
 
@@ -24,4 +24,4 @@ for idx, row in df.iterrows():
             df.at[idx, col] = candidates[candidate_idx]
             candidate_idx += 1
 
-df.to_csv("RetrieverDataset_cleaned.csv", index=False, encoding="utf-8-sig")
+df.to_csv("data/RetrieverDataset_cleaned.csv", index=False, encoding="utf-8-sig")

@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from settings import num_negative_docs, reranker_modelname
+from scripts.settings import num_negative_docs, reranker_modelname
 
 max_length=100000
 
-df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 tokenizer = AutoTokenizer.from_pretrained( reranker_modelname, padding_side='left')
 
@@ -48,5 +48,5 @@ plt.ylabel('Count')
 plt.legend()
 
 
-os.makedirs("Figs", exist_ok=True)
-plt.savefig('Figs/evalRerankerTokenLength.jpg')
+os.makedirs("figs", exist_ok=True)
+plt.savefig('figs/evalRerankerTokenLength.jpg')

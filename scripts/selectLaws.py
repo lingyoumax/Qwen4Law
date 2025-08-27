@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from settings import device, embedding_modelname
+from .settings import device, embedding_modelname
 
 qwen_max_length=8192
 
@@ -87,12 +87,12 @@ def max_min_diverse_subset(text_list, embeddings, k=7000):
 
     return selected_indices
 
-df = pd.read_csv("Laws_All.csv")
+df = pd.read_csv("data/Laws_All.csv")
 text_list = df["内容"].tolist()
 
 embeddings=generate_all_embeddings(text_list)
-np.save("Laws_Embeddings.npy", embeddings)
+np.save("data/Laws_Embeddings.npy", embeddings)
 
 indices=max_min_diverse_subset(text_list, embeddings,10000)
 df_selected = df.iloc[indices]
-df_selected.to_csv("Laws_Selected.csv", index=False, encoding="utf-8-sig")
+df_selected.to_csv("data/Laws_Selected.csv", index=False, encoding="utf-8-sig")

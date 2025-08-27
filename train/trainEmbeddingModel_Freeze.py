@@ -8,18 +8,18 @@ from tqdm.auto import tqdm
 import torch.nn.functional as F
 import os
 
-from settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
-from tools import last_token_pool, evaluateEmbeddingModel, drawLoss
+from scripts.settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
+from scripts.tools import last_token_pool, evaluateEmbeddingModel, drawLoss
 
 lr=1e-5
 n_epoch=10
 temperature = 0.05
-savePath = "EmbeddingModel_Freeze"
+savePath = "weight/EmbeddingModel_Freeze"
 
 if not os.path.exists(savePath):
     os.mkdir(savePath)
 
-df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
@@ -159,7 +159,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
 
     if testloss < best_testloss:
         best_testloss = testloss
-        torch.save(model.state_dict(), f'{savePath}/{savePath}_Best.pth')
+        torch.save(model.state_dict(), f'{savePath}/EmbeddingModel_Freeze_Best.pth')
 
-torch.save(model, f'{savePath}/{savePath}_Final.pth')
-drawLoss(savePath, TrainLoss, TestLoss)  
+torch.save(model, f'{savePath}/EmbeddingModel_Freeze_Final.pth')
+drawLoss("EmbeddingModel_Freeze", TrainLoss, TestLoss)  

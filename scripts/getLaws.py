@@ -5,9 +5,9 @@ import subprocess
 
 url = 'https://flk.npc.gov.cn/api/?'
 
-filename = "laws"
-if not os.path.exists(filename):
-    os.mkdir(filename)
+foldername = "data/laws"
+if not os.path.exists(foldername):
+    os.mkdir(foldername)
 
 types={"flfg":"法律", "jcfg":"监察法规", "sfjs":"司法解释", "xffl":"宪法", "xzfg":"行政法规","dfxfg":"地方性法规"}
 pages={"flfg":70, "jcfg":1, "sfjs":86, "xffl":1, "xzfg":80,"dfxfg":2492}
@@ -44,11 +44,11 @@ for type in types:
                 down_load = 'https://wb.flk.npc.gov.cn'+new_data['result']['body'][ind]['path']
                 name = new_data['result']['body'][ind]['path'].split('.')[-1]
                 content = requests.get(url=down_load,headers=headers).content
-                docx_filename = filename + '/' + title + '.docx'
+                docx_filename = foldername + '/' + title + '.docx'
                 with open(docx_filename, mode='wb') as f:
                     f.write(content)
     
-                pdf_filename = filename + '/'  + title + '.pdf'
+                pdf_filename = foldername + '/'  + title + '.pdf'
                 convert(docx_filename, pdf_filename)
                 subprocess.call("taskkill /im WINWORD.EXE /f", shell=True)   
         except Exception as e:

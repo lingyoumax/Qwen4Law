@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from settings import num_negative_docs, embedding_modelname
+from scripts.settings import num_negative_docs, embedding_modelname
 
 max_length=100000
 
-df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
 
@@ -58,5 +58,5 @@ plt.legend()
 
 plt.tight_layout()
 
-os.makedirs("Figs", exist_ok=True)
-plt.savefig('Figs/evalEmbeddingTokenLength.jpg')
+os.makedirs("figs", exist_ok=True)
+plt.savefig('figs/evalEmbeddingTokenLength.jpg')

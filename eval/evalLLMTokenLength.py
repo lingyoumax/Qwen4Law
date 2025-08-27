@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from settings import llm_modelname
+from scripts.settings import llm_modelname
 
 max_length=100000
 
-df = pd.read_csv("LLMDataset_SFT.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/LLMDataset_SFT.csv", encoding="utf-8-sig")
 
 tokenizer = AutoTokenizer.from_pretrained(llm_modelname)
 
@@ -41,5 +41,5 @@ plt.xlabel('Token Length')
 plt.ylabel('Count')
 plt.legend()
 
-os.makedirs("Figs", exist_ok=True)
-plt.savefig('Figs/evalLLMTokenLength.jpg')
+os.makedirs("figs", exist_ok=True)
+plt.savefig('figs/evalLLMTokenLength.jpg')

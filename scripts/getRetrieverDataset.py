@@ -4,10 +4,12 @@ import pandas as pd
 import random
 from tqdm import tqdm
 import re
-from settings import num_negative_docs
+
+from .config import API_KEY, BASE_URL
+from .settings import num_negative_docs
 client = OpenAI(
-    api_key=config.api_key,
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=API_KEY,
+    base_url=BASE_URL,
 )
 
 def generate_with_qwen(prompt, model="qwen3-235b-a22b-instruct-2507"):
@@ -90,7 +92,7 @@ def getPrompt(positive_doc, negative_docs):
 def row2doc(row):
     return ",".join([str(x) for x in row if pd.notnull(x)])
 
-df=pd.read_csv("Laws_Selected.csv")
+df=pd.read_csv("data/Laws_Selected.csv")
 
 for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
@@ -120,4 +122,4 @@ columns = ["query", "positive_doc"]
 columns.extend([f"negative_doc{i}" for i in range(num_negative_docs)])
 
 RetrieverDataset = pd.DataFrame(data, columns=columns)
-RetrieverDataset.to_csv("RetrieverDataset.csv", index=False, encoding="utf-8-sig")
+RetrieverDataset.to_csv("data/RetrieverDataset.csv", index=False, encoding="utf-8-sig")

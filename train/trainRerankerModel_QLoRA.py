@@ -8,12 +8,12 @@ from torch.utils.data import DataLoader
 from modelscope import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft_model
 
-from settings import device, reranker_modelname, reranker_max_length, num_negative_docs, reranker_batch_size, reranker_test_ratio, random_seed
-from tools import evaluateRerankerModel, drawLoss, computeRerankerScore
+from scripts.settings import device, reranker_modelname, reranker_max_length, num_negative_docs, reranker_batch_size, reranker_test_ratio, random_seed
+from scripts.tools import evaluateRerankerModel, drawLoss, computeRerankerScore
 
 lr=1e-5
 n_epoch=10
-savePath = "RerankerModel_QLoRA"
+savePath = "weight/RerankerModel_QLoRA"
 
 if not os.path.exists(savePath):
     os.mkdir(savePath)
@@ -141,7 +141,7 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
     if testloss < best_testloss:
         best_testloss = testloss
         model.save_pretrained(savePath)
-        torch.save(model.state_dict(), f'{savePath}/{savePath}_Best.pth')
+        torch.save(model.state_dict(), f'{savePath}/RerankerModel_QLoRA_Best.pth')
 
-torch.save(model.state_dict(), f'{savePath}/{savePath}_Final.pth')
-drawLoss(savePath, TrainLoss, TestLoss)
+torch.save(model.state_dict(), f'{savePath}/RerankerModel_QLoRA_Final.pth')
+drawLoss("RerankerModel_QLoRA", TrainLoss, TestLoss)

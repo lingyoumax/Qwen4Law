@@ -12,7 +12,7 @@
 - 来源：[国家法律法规数据库](https://flk.npc.gov.cn/index.html)
 - 预处理：暂时舍弃了目录部分和附录部分，删除了角注、页码和非法字符
 - 数据选取：因为设备资源有限，本项目并不能处理总数据集中的每一条法律条文，只能处理其中一部分子集，为了使得该子集能够尽可能地代表原数据集。使用Qwen3-Embedding-0.6B模型将它们的条文部分内容转化为向量。在向量空间中使用贪心算法获得分布均匀、代表性强的子集。原始数据集大小为382779，未采样的数据集和采样后的数据集的Chamfer距离随采样数量的变化如下图所示。同时在考虑了GPU的推理时间之后，将采样的数量设置为10000。（调用阿里云百炼api生成10000个样本需要花费大约100元，使用QLoRA微调的时间大约是50个小时。这意味着每增加1000个样本，生成成本需要增加10元，训练时间需要增加5个小时。而采样数量越大，chamfer距离的减小速度也越慢。）
-  ![evalLawsSelected](Figs/evalLawsSelected.svg)
+  ![evalLawsSelected](figs/evalLawsSelected.svg)
 - 数据生成：随机选取chunk作为正例样本，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, postive_doc, negative_doc0,...,negative_dock)组合
 - 数据清理：删除了其中正例文档为空的数据，以及对为空的负例文档使用其它文档作了替换，实际得到的数据集大小为9999。
 
@@ -21,7 +21,7 @@
 为了配合Embedding的微调任务，tokenizer直接使用预训练模型对应的分词器
 
 数据集中的query， postive_doc， negative_doc在现有的的tokenizer下对应的token长度分布情况如下图所示，在权衡了覆盖性和GPU能力之后，选择将Tokenizer输出的最大长度定为512。
-![evalEmbeddingTokenLength](Figs/evalEmbeddingTokenLength.jpg)
+![evalEmbeddingTokenLength](figs/evalEmbeddingTokenLength.jpg)
 
 ### Model
 
@@ -37,7 +37,7 @@
 同样使用了预训练模型自带的tokenizer。
 
 如下图所示，同样分析了输入和输出对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为512。
-![evalRerankerTokenLength](Figs/evalRerankerTokenLength.jpg)
+![evalRerankerTokenLength](figs/evalRerankerTokenLength.jpg)
 ### Model
 
 使用Qwen3-Reranker-0.6B架构，采取以下技术路线进行对比实验：
@@ -50,7 +50,7 @@
 同样使用了预训练模型自带的tokenizer。
 
 如下图所示，同样分析了输入对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为1024。
-![evalLLMTokenLength](Figs/evalLLMTokenLength.jpg)
+![evalLLMTokenLength](figs/evalLLMTokenLength.jpg)
 ### Model
 
 使用Qwen3-8B架构，采取以下技术路线进行对比实验：
@@ -69,9 +69,9 @@ $$margin = sim(q,d^+)-max_i(sim(q,d_i^-))$$
 |QLoRA|4686| 0.7048807286024094 | 
 
 Freeze微调训练过程中的Loss曲线：
-![EmbeddingModel_Freeze](Figs/EmbeddingModel_Freeze.svg)
+![EmbeddingModel_Freeze](figs/EmbeddingModel_Freeze.svg)
 QLoRA微调训练过程中的Loss曲线：
-![EmbeddingModel_QLoRA](Figs/EmbeddingModel_QLoRA.svg)
+![EmbeddingModel_QLoRA](figs/EmbeddingModel_QLoRA.svg)
 
 ## Reranker Model
 在微调前，模型的平均得分已经达到了0.9946536738872528，且训练过程中loss只是下降幅度不明显，所以认为该模型并不需要微调。
@@ -87,9 +87,9 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 |Model(SFT)| 0.910 | 0.907| 0.907 |
 
 SFT微调前模型输出与数据集answer的BERTScore分布：
-![evalLLM_based](Figs/evalLLM_based.svg)
+![evalLLM_based](figs/evalLLM_based.svg)
 SFT微调后模型输出与数据集answer的BERTScore分布：
-![evalLLM_SFT](Figs/evalLLM_SFT.svg)
+![evalLLM_SFT](figs/evalLLM_SFT.svg)
 
 # 过程中的思考：
 
@@ -105,7 +105,7 @@ SFT微调后模型输出与数据集answer的BERTScore分布：
 - 为什么使用Byte Level的BPE分词？
   - 因为这样分词能够解决 OOV（Out-Of-Vocabulary）问题，支持所有语言的输入。
 - 如下图所示，Tokenizer的训练中，vocab_size越大，平均chunk对应的token数量就越少，能够加速模型的推理速度，是不是vocab_size越大越好呢？
-  ![evalTokenizer](Figs/evalTokenizer.jpg)
+  ![evalTokenizer](figs/evalTokenizer.jpg)
   - 不是的，因为vocab_size越大，需要存储的embedding矩阵就越大。
   - 同时，如果词表中包含有一些极少见的词，也会使得模型缺少泛化性，过拟合。
   - 如果 vocab_size 非常大，会引起 softmax 层计算复杂度增加（因为softmax 需遍历所有词表），这也会导致推理变慢。

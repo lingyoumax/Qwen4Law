@@ -4,16 +4,16 @@ import pandas as pd
 from datasets import Dataset
 from modelscope import AutoTokenizer, AutoModelForCausalLM
 from transformers import DataCollatorForSeq2Seq, BitsAndBytesConfig, TrainingArguments, Trainer
-
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
-from settings import llm_modelname, random_seed, llm_test_ratio, llm_batch_size, llm_max_length
+
+from scripts.settings import llm_modelname, random_seed, llm_test_ratio, llm_batch_size, llm_max_length
 
 lr = 1e-5
 n_epoch = 10
-savePath = "LLM_SFT"
+savePath = "weight/LLM_SFT"
 os.makedirs(savePath, exist_ok=True)
 
-df = pd.read_csv("LLMDataset_SFT.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/LLMDataset_SFT.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     query=f"Based on the content:{row['doc']}\nAnswer the Question:{row['query']}\n/no_think"

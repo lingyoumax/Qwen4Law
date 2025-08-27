@@ -6,12 +6,12 @@ from torch.utils.data import DataLoader
 from modelscope import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft_model
 
-from settings import device, reranker_modelname, reranker_max_length, num_negative_docs, reranker_batch_size, reranker_test_ratio, random_seed
-from tools import evaluateTrainedRerankerModel
+from scripts.settings import device, reranker_modelname, reranker_max_length, num_negative_docs, reranker_batch_size, reranker_test_ratio, random_seed
+from scripts.tools import evaluateTrainedRerankerModel
 
 lr=1e-5
 n_epoch=10
-savePath = "RerankerModel_QLoRA"
+savePath = "weight/RerankerModel_QLoRA"
 
 if not os.path.exists(savePath):
     os.mkdir(savePath)
@@ -48,7 +48,7 @@ def format_pair(instruction, query, doc):
         pair = "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(instruction=instruction,query=query, doc=doc)
     return prefix + pair + suffix
 
-df = pd.read_csv("RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
+df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
