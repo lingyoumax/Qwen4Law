@@ -78,6 +78,19 @@ QLoRA微调训练过程中的Loss曲线：
 
 $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
+## LLM
+### SFT
+使用测试集部分的query作为输入，将SFT微调前后的模型输出与数据集中的answer作对比，使用BERTScore量化指标。
+|Model| Precision | Recall | F1 |
+|---|---|---|---|
+|Model(Base)|0.896| 0.833 | 0.861 |
+|Model(SFT)| 0.910 | 0.907| 0.907 |
+
+SFT微调前模型输出与数据集answer的BERTScore分布：
+![evalLLM_based](Figs/evalLLM_based.svg)
+SFT微调后模型输出与数据集answer的BERTScore分布：
+![evalLLM_SFT](Figs/evalLLM_SFT.svg)
+
 # 过程中的思考：
 
 ## 总方向
