@@ -27,7 +27,7 @@ test_dataset  = dataset_split["test"]
 
 base_model = AutoModelForCausalLM.from_pretrained(
     llm_modelname,
-    device_map="auto",
+    device_map=device,
     torch_dtype=torch.bfloat16,
     trust_remote_code=True
 )
@@ -38,7 +38,7 @@ if tokenizer.pad_token is None:
 model = PeftModel.from_pretrained(
     base_model, 
     "LLM_SFT"
-)
+).to(device)
 model.eval()
 Candidate = []
 Answers = []

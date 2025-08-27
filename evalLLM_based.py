@@ -26,7 +26,7 @@ test_dataset  = dataset_split["test"]
 
 model = AutoModelForCausalLM.from_pretrained(
     llm_modelname,
-    device_map="auto",
+    device_map=device,
     torch_dtype=torch.bfloat16,
     trust_remote_code=True
 )
