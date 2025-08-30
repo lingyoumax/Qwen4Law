@@ -83,12 +83,15 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 使用测试集部分的query作为输入，将SFT微调前后的模型输出与数据集中的answer作对比，使用BERTScore量化指标。
 |Model| Precision | Recall | F1 |
 |---|---|---|---|
-|Model(Base)|0.896| 0.833 | 0.861 |
-|Model(SFT)| 0.910 | 0.907| 0.907 |
+|Base|0.757|0.594|0.664|
+|RAG|0.896| 0.833 | 0.861 |
+|RAG + SFT| 0.910 | 0.907| 0.907 |
 
-SFT微调前模型输出与数据集answer的BERTScore分布：
+基础模型输出与数据集answer的BERTScore分布：
 ![evalLLM_based](figs/evalLLM_based.svg)
-SFT微调后模型输出与数据集answer的BERTScore分布：
+基础模型搭配RAG输出与数据集answer的BERTScore分布：
+![evalLLM_RAG](figs/evalLLM_RAG.svg)
+微调模型搭配RAG输出与数据集answer的BERTScore分布：
 ![evalLLM_SFT](figs/evalLLM_SFT.svg)
 
 # 过程中的思考：
