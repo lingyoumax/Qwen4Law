@@ -44,18 +44,22 @@
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 ## LLM Model
-### 数据集
-- 数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）
-### Tokenizer
+### SFT
+#### 数据集
+数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）
+#### Tokenizer
 同样使用了预训练模型自带的tokenizer。
 
 如下图所示，同样分析了输入对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为1024。
 ![evalLLMTokenLength](figs/evalLLMTokenLength.jpg)
-### Model
+#### Model
 
 使用Qwen3-8B架构，采取以下技术路线进行对比实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
+### RLHF
+#### 数据集
+数据生成：使用微调Embedding Model的数据集中的(doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer_good, answer_bad)四元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）在设计生成差回答时，设计了信息不完整、表述模糊、缺乏实用性、结构混乱、术语误用和口语化过度的情况。
 # 结果及分析
 
 ## Embedding Model
@@ -94,6 +98,7 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 微调模型搭配RAG输出与数据集answer的BERTScore分布：
 ![evalLLM_SFT](figs/evalLLM_SFT.svg)
 
+
 # 过程中的思考：
 
 ## 总方向
@@ -126,6 +131,9 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 - 为什么SFT微调之后还需要RL微调？
   - SFT的目的是让模型学会基本语言格式和遵循指令，它在训练数据集分布内能够有一个合格的回答。但是它存在一些问题：SFT只会让模型模仿训练集中的答案，如果数据集中的数据量有限，很容易出现过拟合现象，同时，模型也不能主动探索更多的回答空间。
   - 而RL基于人类偏好给予模型反馈，让模型的输出更符合人类偏好（简洁/详细、礼貌/直率、安全/开放，取决于奖励信号）。
+- 为什么不可以直接使用SFT数据集中的query和answer作为RLHF数据集中的query和answer_good？
+  - SFT 中的question“太简单（只有唯一正确答案）”，不适合复用，无法区分 “回答质量差异”
+  - SFT中的answer虽然正确，但是并没有在“人类主观体验”上优化
 
 # 知识笔记
 
