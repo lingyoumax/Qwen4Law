@@ -9,7 +9,7 @@ from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_tr
 from scripts.settings import llm_modelname, random_seed, llm_test_ratio, llm_batch_size, llm_max_length
 
 lr = 1e-5
-n_epoch = 10
+n_epoch = 20
 savePath = "weight/LLM_SFT"
 os.makedirs(savePath, exist_ok=True)
 

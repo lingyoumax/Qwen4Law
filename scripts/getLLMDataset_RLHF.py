@@ -1,6 +1,7 @@
 from openai import OpenAI
 import pandas as pd
 from tqdm import tqdm
+import os
 
 from .config import API_KEY, BASE_URL
 
@@ -167,7 +168,6 @@ for i in tqdm(range(df.shape[0])):
     try:
         goodResult = generate_with_qwen(goodPrompt)
         badResult = generate_with_qwen(badPrompt)
-        #result=clean_text(result)
         d=[query, doc, goodResult, badResult]
         data.append(d)
     except Exception as e:
@@ -175,9 +175,19 @@ for i in tqdm(range(df.shape[0])):
         print(e)
         print(goodResult)
         print(badResult)
-        print()
-        continue
+        if goodResult and badResult:
+            d=[query, doc, goodResult, badResult]
+            data.append(d)
+    if i%100 == 99:
+        columns = ["query", "doc", "answer_good", "answer_bad"]
+        RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
+        file_path = "data/LLMDataset_RLHF.csv"
+        header = not os.path.exists(file_path)
+        RetrieverData_selfinstruct.to_csv(file_path, mode="a", index=False, header=header, encoding="utf-8-sig")
+        data = []
     
 columns = ["query", "doc", "answer_good", "answer_bad"]
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
-RetrieverData_selfinstruct.to_csv("data/LLMDataset_RLHF.csv", index=False, encoding="utf-8-sig")
+file_path = "data/LLMDataset_RLHF.csv"
+header = not os.path.exists(file_path)
+RetrieverData_selfinstruct.to_csv(file_path, mode="a", index=False, header=header, encoding="utf-8-sig")
