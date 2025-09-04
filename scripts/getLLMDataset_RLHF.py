@@ -162,10 +162,10 @@ for i in tqdm(range(df.shape[0])):
     row = df.iloc[i]
     doc = row["positive_doc"]
     queryPrompt = getQueryPrompt(doc)
-    query = generate_with_qwen(queryPrompt)
-    goodPrompt=getGoodPrompt(query, doc)
-    badPrompt=getBadPrompt(query, doc)
     try:
+        query = generate_with_qwen(queryPrompt)
+        goodPrompt=getGoodPrompt(query, doc)
+        badPrompt=getBadPrompt(query, doc)
         goodResult = generate_with_qwen(goodPrompt)
         badResult = generate_with_qwen(badPrompt)
         d=[query, doc, goodResult, badResult]
