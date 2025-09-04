@@ -181,3 +181,30 @@ def drawLoss(saveName, TrainLoss, TestLoss):
     plt.ylabel("Loss of Test Set")
 
     plt.savefig(f"figs/{saveName}.svg")
+
+def evaluateRewardModel(model, dataloader, token_false_id, token_true_id, temperature):
+    # 计算模型在测试集上的Loss
+    model.eval()
+    l = 0
+    total = len(dataloader)
+    with torch.inference_mode():
+        for batch in dataloader:
+            good_prompt_dict=BatchEncoding({"input_ids":batch["good_prompt_input_ids"],"attention_mask":batch["good_prompt_attention_mask"]})
+            good_batch_scores = model(**good_prompt_dict).logits[:, -1, :]
+            good_true_vector = good_batch_scores[:, token_true_id]
+            good_false_vector = good_batch_scores[:, token_false_id]
+            good_s = good_true_vector - good_false_vector
+
+            bad_prompt_dict=BatchEncoding({"input_ids":batch["bad_prompt_input_ids"],"attention_mask":batch["bad_prompt_attention_mask"]})
+            bad_batch_scores = model(**bad_prompt_dict).logits[:, -1, :]
+            bad_true_vector = bad_batch_scores[:, token_true_id]
+            bad_false_vector = bad_batch_scores[:, token_false_id]
+            bad_s = bad_true_vector - bad_false_vector
+
+            B = bad_s.size(0)
+            loss = -torch.sum(torch.log(torch.sigmoid((good_s-bad_s)/temperature)))
+            l = l + loss.item()
+            total = total + B
+            
+    model.train()
+    return l/total if total > 0 else 0

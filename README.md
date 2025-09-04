@@ -43,24 +43,28 @@
 使用Qwen3-Reranker-0.6B架构，采取以下技术路线进行对比实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
-## LLM Model
-### SFT
-#### 数据集
+## LLM Model - SFT
+### 数据集
 数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）
-#### Tokenizer
+### Tokenizer
 同样使用了预训练模型自带的tokenizer。
 
 如下图所示，同样分析了输入对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为1024。
 ![evalLLMTokenLength](figs/evalLLMTokenLength.jpg)
-#### Model
+### Model
 
 使用Qwen3-8B架构，采取以下技术路线进行对比实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
-### RLHF
-#### 数据集
+## Reward Model
+### 数据集
 数据生成：使用微调Embedding Model的数据集中的(doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer_good, answer_bad)四元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）在设计生成差回答时，设计了信息不完整、表述模糊、缺乏实用性、结构混乱、术语误用和口语化过度的情况。
-####  Reward Model
+### Tokenizer
+同样使用了预训练模型自带的tokenizer。
+
+如下图所示，同样分析了输入对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为1024。
+![evalRewardModelTokenLength](figs/evalRewardModelTokenLength.jpg)
+### Model
 使用Qwen3-0.6B架构，采取以下技术路线进行对比实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
@@ -216,7 +220,11 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
 ## 20250902
 
-- 今天在设计微调奖励模型的损失函数，初始时计划将损失函数设计成$-E[log(\sigma (r_w-r_l))]$，但是我们的$r_w-r_l$的取值范围是$[-1,1]$，经过$\sigma$函数之后会进一步压缩范围，所以改成$-E[log(r_w-r_l)]$。但是这样会带来一个新的问题，那就是$r_w$和$r_l$同时下降，但是$r_l$下降的幅度更大，此时损失函数也会下降，所以我们不能只关注两者的差值，而应该分别独立观察它们的值。所以将损失函数修改为$-E[log(r_w)+log(1-r_l)]$，也就是$-E[log(r_w*(1-r_l))]$。在理想情况下，
+- 今天在设计微调奖励模型的损失函数，初始时计划将损失函数设计成$-E[log(\sigma (r_w-r_l))]$，但是我们的$r_w-r_l$的取值范围是$[-1,1]$，经过$\sigma$函数之后会进一步压缩范围，所以改成$-E[log(r_w-r_l)]$。但是这样会带来一个新的问题，那就是$r_w$和$r_l$同时下降，但是$r_l$下降的幅度更大，此时损失函数也会下降，所以我们不能只关注两者的差值，而应该分别独立观察它们的值。所以将损失函数修改为$-E[log(r_w)+log(1-r_l)]$，也就是$-E[log(r_w*(1-r_l))]$。
+
+## 20250904
+
+- 直接关注奖励模型输出的得分不可取，因为中间
 
 # 参考文献
  ```bibtex
