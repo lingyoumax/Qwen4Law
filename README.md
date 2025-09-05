@@ -43,7 +43,7 @@
 使用Qwen3-Reranker-0.6B架构，采取以下技术路线进行对比实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
-## LLM Model - SFT
+## LLM-SFT
 ### 数据集
 数据生成：使用微调Embedding Model的数据集中的(query, positive_doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer)三元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）
 ### Tokenizer
@@ -70,7 +70,10 @@
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 
 损失函数定义如下：
-$$L=-E[log(r_w*(1-r_l))]$$
+$$s=l_{yes}-l_{no}, L=-E[log(sigmoid(s^+-s^-))]$$
+
+其中，$l_{yes}$和$l_{no}$分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表中的值。
+
 # 结果及分析
 
 ## Embedding Model
@@ -93,8 +96,7 @@ QLoRA微调训练过程中的Loss曲线：
 
 $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
-## LLM
-### SFT
+## LLM-SFT
 使用测试集部分的query作为输入，将SFT微调前后的模型输出与数据集中的answer作对比，使用BERTScore量化指标。
 |Model| Precision | Recall | F1 |
 |---|---|---|---|
@@ -108,6 +110,15 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 ![evalLLM_RAG](figs/evalLLM_RAG.svg)
 微调模型搭配RAG输出与数据集answer的BERTScore分布：
 ![evalLLM_SFT](figs/evalLLM_SFT.svg)
+
+## Reward Model
+在测试集上分别使用HPC（人类偏好一致性）、MD（均值差）和CVR（变异系数比）来评估奖励模型。
+$$HPC=E[𝟙_{R^+}(r^+-r^-)],MD=E[r^+-r^-],CVR=(\frac{\sigma (r^+)}{\mu(r^+)}+\frac{\sigma (r^-)}{\mu(r^-)})/2$$
+其中，$𝟙,\sigma,\mu$分别为指示函数、标准差函数和均值函数
+|Model| HPC | MD | CVR |
+|---|---|---|---|
+|Base|0.8855|0.13909377606213102|0.12650735561688936|
+|QLoRA|1.0| 0.747557582023192| 8.223995931833096|
 
 
 # 过程中的思考：

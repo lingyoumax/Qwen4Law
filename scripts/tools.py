@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import os
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
+import numpy as np
 
 from .settings import device, num_negative_docs
 
@@ -167,28 +168,13 @@ def evaluateTrainedRerankerModel(model, dataloader, token_true_id , token_false_
     model.train()
     return score/total if total > 0 else 0
 
-def drawLoss(saveName, TrainLoss, TestLoss):
-    plt.figure(figsize=(20, 10))
-
-    plt.subplot(1, 2, 1)
-    plt.plot(TrainLoss, color='limegreen')
-    plt.xlabel('Epoch')
-    plt.ylabel("Loss of Training Set")
-
-    plt.subplot(1, 2, 2)
-    plt.plot(TestLoss, color='darkviolet')
-    plt.xlabel('Epoch')
-    plt.ylabel("Loss of Test Set")
-
-    plt.savefig(f"figs/{saveName}.svg")
-
 def evaluateRewardModel(model, dataloader, token_false_id, token_true_id, temperature):
     # 计算模型在测试集上的Loss
     model.eval()
     l = 0
-    total = len(dataloader)
+    total = 0
     with torch.inference_mode():
-        for batch in dataloader:
+        for batch in tqdm(dataloader):
             good_prompt_dict=BatchEncoding({"input_ids":batch["good_prompt_input_ids"],"attention_mask":batch["good_prompt_attention_mask"]})
             good_batch_scores = model(**good_prompt_dict).logits[:, -1, :]
             good_true_vector = good_batch_scores[:, token_true_id]
@@ -208,3 +194,63 @@ def evaluateRewardModel(model, dataloader, token_false_id, token_true_id, temper
             
     model.train()
     return l/total if total > 0 else 0
+
+def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id):
+    # 计算模型在测试集上的HPC（人类偏好一致性）、MD（均值差）、CVR（变异系数比）
+    model.eval()
+    total = 0
+    hpc_count = 0
+    good_scores=[]
+    bad_scores=[]
+    with torch.inference_mode():
+        for batch in tqdm(dataloader):
+            good_prompt_dict=BatchEncoding({"input_ids":batch["good_prompt_input_ids"],"attention_mask":batch["good_prompt_attention_mask"]})
+            good_batch_scores = model(**good_prompt_dict).logits[:, -1, :]
+            good_true_vector = good_batch_scores[:, token_true_id]
+            good_false_vector = good_batch_scores[:, token_false_id]
+            good_batch_scores = torch.stack([good_false_vector, good_true_vector], dim=1)
+            good_score=torch.nn.functional.log_softmax(good_batch_scores, dim=1)[:, 1].exp()
+
+            bad_prompt_dict=BatchEncoding({"input_ids":batch["bad_prompt_input_ids"],"attention_mask":batch["bad_prompt_attention_mask"]})
+            bad_batch_scores = model(**bad_prompt_dict).logits[:, -1, :]
+            bad_true_vector = bad_batch_scores[:, token_true_id]
+            bad_false_vector = bad_batch_scores[:, token_false_id]
+            bad_batch_scores = torch.stack([bad_false_vector, bad_true_vector], dim=1)
+            bad_score=torch.nn.functional.log_softmax(bad_batch_scores, dim=1)[:, 1].exp()
+
+            B = good_score.size(0)
+            hpc_count += (good_score > bad_score).int().sum().item()
+            total = total + B
+            good_scores.extend(good_score.tolist())
+            bad_scores.extend(bad_score.tolist())
+            
+    model.train()
+    hpc = hpc_count / total if total > 0 else 0.0
+    good_scores_np = np.array(good_scores)
+    bad_scores_np = np.array(bad_scores)
+    
+    mean_good = np.mean(good_scores_np)
+    mean_bad = np.mean(bad_scores_np)
+    md = mean_good - mean_bad
+
+    eps = 1e-8
+    cv_good = np.std(good_scores_np) / (mean_good + eps)
+    cv_bad = np.std(bad_scores_np) / (mean_bad + eps)
+    cvr = (cv_good + cv_bad) / 2
+
+    return hpc, md, cvr
+
+def drawLoss(saveName, TrainLoss, TestLoss):
+    plt.figure(figsize=(20, 10))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(TrainLoss, color='limegreen')
+    plt.xlabel('Epoch')
+    plt.ylabel("Loss of Training Set")
+
+    plt.subplot(1, 2, 2)
+    plt.plot(TestLoss, color='darkviolet')
+    plt.xlabel('Epoch')
+    plt.ylabel("Loss of Test Set")
+
+    plt.savefig(f"figs/{saveName}.svg")

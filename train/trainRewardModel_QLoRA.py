@@ -1,4 +1,4 @@
-from modelscope import AutoModel, AutoTokenizer, BitsAndBytesConfig
+from modelscope import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers import BatchEncoding
 from datasets import Dataset
 import torch
@@ -7,14 +7,13 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from peft import TaskType, prepare_model_for_kbit_training, LoraConfig, get_peft_model
 import torch
-import torch.nn.functional as F
 import os
 
 from scripts.settings import random_seed, rewardmodel_test_ratio, device, rewardmodel_modelname, rewardmodel_max_length, rewardmodel_batch_size
 from scripts.tools import evaluateRewardModel, drawLoss
 
 lr = 1e-5
-n_epoch = 10
+n_epoch = 20
 temperature = 1
 savePath = "weight/RewardModel_QLoRA"
 os.makedirs(savePath, exist_ok=True)
@@ -47,7 +46,7 @@ bnb_config = BitsAndBytesConfig(
     bnb_4bit_compute_dtype=torch.float16,
 )
 
-model = AutoModel.from_pretrained(
+model = AutoModelForCausalLM.from_pretrained(
     rewardmodel_modelname,
     quantization_config=bnb_config,
     device_map = device
@@ -56,12 +55,12 @@ model = AutoModel.from_pretrained(
 model = prepare_model_for_kbit_training(model,gradient_checkpointing_kwargs={"use_reentrant":False})
 
 lora_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
+    r=8,
+    lora_alpha=16,
     target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
     lora_dropout=0.1,
     bias="none",
-    task_type=TaskType.FEATURE_EXTRACTION
+    task_type=TaskType.CAUSAL_LM
 )
 
 model = get_peft_model(model, lora_config).to(device)
@@ -140,10 +139,11 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         trainloss=trainloss+loss.item()
 
     trainloss=trainloss/len(train_dataloader)
-    testloss = evaluateRewardModel(model, test_dataloader, temperature)
+    testloss = evaluateRewardModel(model, test_dataloader, token_false_id, token_true_id, temperature)
     tqdm.write(f"Epoch {epoch}: Training Loss = {trainloss:.4f}, Test loss = {testloss:.4f}")
     TrainLoss.append(trainloss)
     TestLoss.append(testloss)
+    drawLoss('RewardModel_QLoRA', TrainLoss, TestLoss)
 
     if testloss < best_testloss:
         best_testloss = testloss
