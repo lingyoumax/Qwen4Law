@@ -14,7 +14,6 @@ from scripts.tools import evaluateRewardModel, drawLoss
 
 lr = 1e-5
 n_epoch = 20
-temperature = 1
 savePath = "weight/RewardModel_QLoRA"
 os.makedirs(savePath, exist_ok=True)
 
@@ -112,8 +111,8 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
 TrainLoss = []
 TestLoss = []
-TrainLoss.append(evaluateRewardModel(model, train_dataloader, token_false_id, token_true_id, temperature))
-TestLoss.append(evaluateRewardModel(model, test_dataloader, token_false_id, token_true_id, temperature))
+TrainLoss.append(evaluateRewardModel(model, train_dataloader, token_false_id, token_true_id))
+TestLoss.append(evaluateRewardModel(model, test_dataloader, token_false_id, token_true_id))
 best_testloss=TestLoss[0]
 drawLoss('RewardModel_QLoRA', TrainLoss, TestLoss)
 
@@ -133,13 +132,15 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         bad_false_vector = bad_batch_scores[:, token_false_id]
         bad_s = bad_true_vector - bad_false_vector
         
-        loss = -torch.mean(torch.log(torch.sigmoid((good_s-bad_s)/temperature)))
+        good_loss = -torch.mean(torch.log(torch.sigmoid(good_s)))
+        bad_loss = -torch.mean(torch.log(1-torch.sigmoid(bad_s)))
+        loss=good_loss+bad_loss
         loss.backward()
         optimizer.step()
         trainloss=trainloss+loss.item()
 
     trainloss=trainloss/len(train_dataloader)
-    testloss = evaluateRewardModel(model, test_dataloader, token_false_id, token_true_id, temperature)
+    testloss = evaluateRewardModel(model, test_dataloader, token_false_id, token_true_id)
     tqdm.write(f"Epoch {epoch}: Training Loss = {trainloss:.4f}, Test loss = {testloss:.4f}")
     TrainLoss.append(trainloss)
     TestLoss.append(testloss)

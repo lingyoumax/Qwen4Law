@@ -67,7 +67,7 @@ test_dataloader = DataLoader(
 
 token_false_id = tokenizer.convert_tokens_to_ids("no")
 token_true_id = tokenizer.convert_tokens_to_ids("yes")
-hpc, md, cvr = evaluateTrainedRewardModel(model, test_dataloader, token_false_id, token_true_id)
+hpc, md, disp = evaluateTrainedRewardModel(model, test_dataloader, token_false_id, token_true_id)
 print(hpc)
 print(md)
-print(cvr)
+print(disp)

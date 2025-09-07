@@ -168,7 +168,7 @@ def evaluateTrainedRerankerModel(model, dataloader, token_true_id , token_false_
     model.train()
     return score/total if total > 0 else 0
 
-def evaluateRewardModel(model, dataloader, token_false_id, token_true_id, temperature):
+def evaluateRewardModel(model, dataloader, token_false_id, token_true_id):
     # 计算模型在测试集上的Loss
     model.eval()
     l = 0
@@ -188,7 +188,9 @@ def evaluateRewardModel(model, dataloader, token_false_id, token_true_id, temper
             bad_s = bad_true_vector - bad_false_vector
 
             B = bad_s.size(0)
-            loss = -torch.sum(torch.log(torch.sigmoid((good_s-bad_s)/temperature)))
+            good_loss = -torch.sum(torch.log(torch.sigmoid(good_s)))
+            bad_loss = -torch.sum(torch.log(1-torch.sigmoid(bad_s)))
+            loss=good_loss+bad_loss
             l = l + loss.item()
             total = total + B
             
@@ -196,7 +198,7 @@ def evaluateRewardModel(model, dataloader, token_false_id, token_true_id, temper
     return l/total if total > 0 else 0
 
 def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id):
-    # 计算模型在测试集上的HPC（人类偏好一致性）、MD（均值差）、CVR（变异系数比）
+    # 计算模型在测试集上的HPC（人类偏好一致性）、MD（均值差）、Disp（合并标准差）
     model.eval()
     total = 0
     hpc_count = 0
@@ -209,14 +211,14 @@ def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id)
             good_true_vector = good_batch_scores[:, token_true_id]
             good_false_vector = good_batch_scores[:, token_false_id]
             good_batch_scores = torch.stack([good_false_vector, good_true_vector], dim=1)
-            good_score=torch.nn.functional.log_softmax(good_batch_scores, dim=1)[:, 1].exp()
+            good_score=torch.nn.functional.softmax(good_batch_scores, dim=1)[:, 1]
 
             bad_prompt_dict=BatchEncoding({"input_ids":batch["bad_prompt_input_ids"],"attention_mask":batch["bad_prompt_attention_mask"]})
             bad_batch_scores = model(**bad_prompt_dict).logits[:, -1, :]
             bad_true_vector = bad_batch_scores[:, token_true_id]
             bad_false_vector = bad_batch_scores[:, token_false_id]
             bad_batch_scores = torch.stack([bad_false_vector, bad_true_vector], dim=1)
-            bad_score=torch.nn.functional.log_softmax(bad_batch_scores, dim=1)[:, 1].exp()
+            bad_score=torch.nn.functional.softmax(bad_batch_scores, dim=1)[:, 1]
 
             B = good_score.size(0)
             hpc_count += (good_score > bad_score).int().sum().item()
@@ -233,12 +235,11 @@ def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id)
     mean_bad = np.mean(bad_scores_np)
     md = mean_good - mean_bad
 
-    eps = 1e-8
-    cv_good = np.std(good_scores_np) / (mean_good + eps)
-    cv_bad = np.std(bad_scores_np) / (mean_bad + eps)
-    cvr = (cv_good + cv_bad) / 2
+    std_good = np.std(good_scores_np)
+    std_bad = np.std(bad_scores_np)
+    disp = np.sqrt((std_good**2 + std_bad**2) / 2)
 
-    return hpc, md, cvr
+    return hpc, md, disp
 
 def drawLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))
