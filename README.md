@@ -65,13 +65,24 @@
 如下图所示，同样分析了输入对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为1024。
 ![evalRewardModelTokenLength](figs/evalRewardModelTokenLength.jpg)
 ### Model
+输入问答对之后，通过提示词方式让LLM判断这个回答是否是一个好回答，是的话就输出"yes"，不是的话就输出"no"，通过比较LLM对这两个Token的预测值，来评价该模型的得分$r$
+
 使用Qwen3-0.6B架构，采取以下技术路线进行对比实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 
 损失函数设计如下：
-
-$$s=l_{yes}-l_{no},-E[\log (sigmoid(s^+))+\log((1-sigmoid(s^-)))]$$
+$$\begin{align*}
+&\because r=\frac{e^{l_{yes}}}{e^{l_{yes}}+e^{l_{no}}}=\frac{1}{1+e^{-(l_{yes}-l_{no})}}=sigmoid(l_{yes}-l_{no})\\
+&\text{令} s=l_{yes}-l_{no}\\
+&\therefore r=sigmoid(s)\\
+&\text{将}r^+\text{和}r^-\text{代入交叉熵计算公式，可得}\\
+&MSE^+=-E[1*\log(r^+)+0*\log(1-r^+)]=-E[log(r^+)]\\
+&MSE^-=-E[0*\log(r^-)+1*\log(1-r^-)]=-E[log(1-r^-)]\\
+&\therefore Loss = MSE^++MSE^-=-E[log(r^+)+log(1-r^-)]\\
+&\text{将}r=sigmoid(s)\text{和}s=l_{yes}-l_{no}\text{代入，可得}\\
+&\therefore Loss=-E[log(sigmoid(l^+_{yes}-l^+_{no}))+log(1-sigmoid(l^-_{yes}-l^-_{no}))]
+\end{align*}$$
 
 其中，$l_{yes}$和$l_{no}$分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表中的值。
 
@@ -119,7 +130,7 @@ $$HPC=E[𝟙_{R^+}(r^+-r^-)],MD=E[r^+-r^-],Disp=\sqrt{\frac{\sigma (r^+)^2+\sigm
 |Model| HPC | MD | Disp |
 |---|---|---|---|
 |Base|0.8855|0.13909377606213102|0.09623180495273174|
-|QLoRA|1.0| 0.7823254278193261| 0.19945179773682697|
+|QLoRA|1.0| 0.9578133311134132| 0.087415625331022167|
 
 
 # 过程中的思考：
@@ -232,7 +243,7 @@ $$HPC=E[𝟙_{R^+}(r^+-r^-)],MD=E[r^+-r^-],Disp=\sqrt{\frac{\sigma (r^+)^2+\sigm
 
 ## 20250907
 
-- 今天在设计微调奖励模型的损失函数，初始时计划将损失函数设计成$-E[log(\sigma (r_w-r_l))]$，但是我们的$r_w-r_l$的取值范围是$[-1,1]$，经过$\sigma$函数之后会进一步压缩范围，所以改成$-E[log(r_w-r_l)]$。但是这样会带来一个新的问题，那就是$r_w$和$r_l$同时下降，但是$r_l$下降的幅度更大，此时损失函数也会下降，所以我们不能只关注两者的差值，而应该分别独立观察它们的值。这时想到了交叉熵函数$-(y^*log(y)+(1-y^*)log(1-y))$。分别将$r^+$和$r^-$的计算方式代入可得$-(\log (sigmoid(s^+))+\log (1-sigmoid(s^-)))$，也就是$-\log (sigmoid(s^+)(1-sigmoid(s^-)))$。
+- 今天在设计微调奖励模型的损失函数，初始时计划将损失函数设计成$-E[\log(sigmoid (r^+-r^-))]$，但是我们的$r^+-r_-$的取值范围是$[-1,1]$，经过$sigmoid$函数之后会进一步压缩范围，所以改成$-E[\log(sigmoid(s^+-s^-))]$。但是这样会带来一个新的问题，那就是$s^+$可能和$s^-$同时下降，但是$s^-$下降的幅度更大，此时损失函数也会下降，所以我们不能只关注两者的差值，而应该分别独立观察它们的值。在实验过后，还发现了一个问题，我们的损失函数设计是针对的$s^+$和$s^-$之间的差值，将其转换为$r^+$和$r^-$之后，虽然模型在HPC和MD两个指标都有提升，但是Disp指标上下降明显。此时将损失函数设置为这时想到了交叉熵函数$-(y^*log(y)+(1-y^*)log(1-y))$。分别将$r^+$和$r^-$的计算方式代入可得$-(\log (sigmoid(s^+))+\log (1-sigmoid(s^-)))$，也就是$-\log (sigmoid(s^+)(1-sigmoid(s^-)))$。
 
 # 参考文献
  ```bibtex

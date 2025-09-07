@@ -13,7 +13,7 @@ from scripts.settings import random_seed, rewardmodel_test_ratio, device, reward
 from scripts.tools import evaluateRewardModel, drawLoss
 
 lr = 1e-5
-n_epoch = 20
+n_epoch = 5
 savePath = "weight/RewardModel_QLoRA"
 os.makedirs(savePath, exist_ok=True)
 
@@ -149,7 +149,5 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
     if testloss < best_testloss:
         best_testloss = testloss
         model.save_pretrained(savePath)
-        torch.save(model.state_dict(), f'{savePath}/RewardModel_QLoRA_Best.pth')
 
-torch.save(model.state_dict(), f'{savePath}/RewardModel_QLoRA_Final.pth')
 drawLoss("RewardModel_QLoRA", TrainLoss, TestLoss)
