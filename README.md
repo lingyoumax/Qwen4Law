@@ -58,7 +58,7 @@
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 ## Reward Model
 ### 数据集
-数据生成：使用微调Embedding Model的数据集中的(doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer_good, answer_bad)四元组。（由于api对于敏感词的审核较为严格，实际得到的数据集大小为9991）在设计生成差回答时，设计了信息不完整、表述模糊、缺乏实用性、结构混乱、术语误用和口语化过度的情况。
+数据生成：使用微调Embedding Model的数据集中的(doc)数据，基于qwen3-235b-a22b-instruct-2507模型使用self instruct方法自动化生成(query, doc, answer_good, answer_bad)四元组。同时，使用经过SFT微调后的LLM生成的回答作为answer_median。在设计生成差回答时，设计了信息不完整、表述模糊、缺乏实用性、结构混乱、术语误用和口语化过度的情况。
 ### Tokenizer
 同样使用了预训练模型自带的tokenizer。
 
@@ -76,12 +76,14 @@ $$\begin{align*}
 &\because r=\frac{e^{l_{yes}}}{e^{l_{yes}}+e^{l_{no}}}=\frac{1}{1+e^{-(l_{yes}-l_{no})}}=sigmoid(l_{yes}-l_{no})\\
 &\text{令} s=l_{yes}-l_{no}\\
 &\therefore r=sigmoid(s)\\
-&\text{将}r^+\text{和}r^-\text{代入交叉熵计算公式，可得}\\
-&BCE^+=-E[1*\log(r^+)+0*\log(1-r^+)]=-E[log(r^+)]\\
-&BCE^-=-E[0*\log(r^-)+1*\log(1-r^-)]=-E[log(1-r^-)]\\
-&\therefore Loss = BCE^++BCE^-=-E[log(r^+)+log(1-r^-)]\\
-&\text{将}r=sigmoid(s)\text{和}s=l_{yes}-l_{no}\text{代入，可得}\\
-&Loss=-E[log(sigmoid(l^+_{yes}-l^+_{no}))+log(1-sigmoid(l^-_{yes}-l^-_{no}))]
+&\text{将}r^{good}\text{和}r^{bad}\text{代入交叉熵计算公式，可得}\\
+&Loss^{good}=-E[1*\log(r^{good})+0*\log(1-r^{good})]=-E[log(r^{good})]\\
+&Loss^{bad}=-E[0*\log(r^{bad})+1*\log(1-r^{bad})]=-E[log(1-r^{bad})]\\
+&\text{同时引入了}Loss^{median},\text{它和}Loss^{good},Loss^{bad}\text{在量纲上保持一致}\\
+&Loss^{median}=-E[log(1-|0.5-r^{median}|)]\\
+&\therefore Loss = Loss^{good}+Loss^{median}+Loss^{bad}\\
+&=-E[log(r^{good})+log(1-|0.5-r^{median}|)+log(1-r^{bad})]\\
+
 \end{align*}$$
 
 其中，$l_{yes}$和$l_{no}$分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表中的值。
@@ -125,26 +127,27 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
 ## Reward Model
 在测试集上分别使用HPC（人类偏好一致性）、MD（均值差）和Disp（合并标准差）来评估奖励模型。
-$$HPC=E[𝟙_{R^+}(r^+-r^-)],MD=E[r^+-r^-],Disp=\sqrt{\frac{\sigma (r^+)^2+\sigma (r^-)^2}{2}}$$
 
-|Model| HPC | MD | Disp |
-|---|---|---|---|
-|Base|0.8855|0.13909377606213102|0.09623180495273174|
-|QLoRA|1.0| 0.9968128237673659| 0.02908888012174566|
+$HPC=E[𝟙_{R^+}(r^{good}-r^{median})\&𝟙_{R^+}(r^{median}-r^{bad})]$
+
+$MD_{good,median}=E[r^{good}-r^{median}]$
+
+$MD_{median,bad}=E[r^{median}-r^{bad}]$
+
+$Disp=\sqrt{\frac{\sigma (r^{good})^2+\sigma (r^{median})^2+\sigma (r^{bad})^2}{3}}$
+
+|Model| $HPC$ | $MD_{good,median}$ | $MD_{median,bad}$ | Disp |
+|---|---|---|---| --- |
+|Base|0.8855|0.13909377606213102|0.09623180495273174| |
+|QLoRA|1.0| 0.9968128237673659| 0.02908888012174566| |
 
 微调训练过程中的Loss曲线：
 ![RewardModel_QLoRA](figs/RewardModel_QLoRA.svg)
 # 过程中的思考：
-
-## 总方向
-
 - 为什么使用RAG？
   - 因为法律规定过几年会改变，如果使用RAG的形式，可以直接修改知识库。而如果只微调模型让其记住这些法律知识，那么就需要将整个模型重新微调才能记住新的法律，并且可能会遗留下旧版本的法律的记忆。
 - 为什么做了RAG还要做微调呢？
-  - 因为没有经过微调的大模型只是在普遍场景下比较好，特定在法律知识问答任务下的能力并不是很好。
-
-## RAG
-
+  - 因为没有经过微调的大模型只是在普遍场景下比较好，特定在法律知识问
 - 为什么使用Byte Level的BPE分词？
   - 因为这样分词能够解决 OOV（Out-Of-Vocabulary）问题，支持所有语言的输入。
 - 如下图所示，Tokenizer的训练中，vocab_size越大，平均chunk对应的token数量就越少，能够加速模型的推理速度，是不是vocab_size越大越好呢？
@@ -245,6 +248,10 @@ $$HPC=E[𝟙_{R^+}(r^+-r^-)],MD=E[r^+-r^-],Disp=\sqrt{\frac{\sigma (r^+)^2+\sigm
 ## 20250907
 
 - 今天在设计微调奖励模型的损失函数，初始时计划将损失函数设计成$-E[\log(sigmoid (r^+-r^-))]$，但是我们的$r^+-r_-$的取值范围是$[-1,1]$，经过$sigmoid$函数之后会进一步压缩范围，所以改成$-E[\log(sigmoid(s^+-s^-))]$。但是这样会带来一个新的问题，那就是$s^+$可能和$s^-$同时下降，但是$s^-$下降的幅度更大，此时损失函数也会下降，所以我们不能只关注两者的差值，而应该分别独立观察它们的值。在实验过后，还发现了一个问题，我们的损失函数设计是针对的$s^+$和$s^-$之间的差值，将其转换为$r^+$和$r^-$之后，虽然模型在HPC和MD两个指标都有提升，但是Disp指标上下降明显。此时将损失函数设置为这时想到了交叉熵函数$-(y^*log(y)+(1-y^*)log(1-y))$。分别将$r^+$和$r^-$的计算方式代入可得$-(\log (sigmoid(s^+))+\log (1-sigmoid(s^-)))$，也就是$-\log (sigmoid(s^+)(1-sigmoid(s^-)))$。
+  
+## 20250908
+
+- 今天开始使用GRPO微调LLM时，发现经过SFT的LLM的奖励值已经达到了0.99级别了，这意味着不需要微调也能够得到很好的结果。经过分析后发现，是因为在训练奖励模型时，没有设置中间奖励值，奖励值只有0和1两个类别。这就导致奖励模型在学习时可能会将其SFT模型输出和我们期待输出的共同点当作关键信息进行学习。这说明我们在设计奖励值时应该多涉及一些中间奖励值。
 
 # 参考文献
  ```bibtex

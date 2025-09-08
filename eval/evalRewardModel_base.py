@@ -21,6 +21,7 @@ def format_instruction(instruction, query, answer):
 def row_to_sample(row):
     return {
         "good_prompt": prefix + format_instruction(task,row["query"],row["answer_good"]) + suffix,
+        "median_prompt": prefix + format_instruction(task,row["query"],row["answer_median"]) + suffix,
         "bad_prompt": prefix + format_instruction(task,row["query"],row["answer_bad"]) + suffix
     }
 
@@ -34,11 +35,14 @@ tokenizer = AutoTokenizer.from_pretrained(rewardmodel_modelname, padding_side='l
 
 def tokenize_function(example):
     good_prompt = tokenizer(example["good_prompt"], padding="max_length", truncation=True, max_length=rewardmodel_max_length, return_tensors="pt")
+    median_prompt = tokenizer(example["median_prompt"], padding="max_length", truncation=True, max_length=rewardmodel_max_length, return_tensors="pt")
     bad_prompt = tokenizer(example["bad_prompt"], padding="max_length", truncation=True, max_length=rewardmodel_max_length, return_tensors="pt")
 
     features = {
         "good_prompt_input_ids": good_prompt["input_ids"][0],
         "good_prompt_attention_mask": good_prompt["attention_mask"][0],
+        "median_prompt_input_ids": median_prompt["input_ids"][0],
+        "median_prompt_attention_mask": median_prompt["attention_mask"][0],
         "bad_prompt_input_ids": bad_prompt["input_ids"][0],
         "bad_prompt_attention_mask": bad_prompt["attention_mask"][0]
     }
@@ -64,7 +68,8 @@ test_dataloader = DataLoader(
 
 token_false_id = tokenizer.convert_tokens_to_ids("no")
 token_true_id = tokenizer.convert_tokens_to_ids("yes")
-hpc, md, disp = evaluateTrainedRewardModel(model, test_dataloader, token_false_id, token_true_id)
+hpc, md_good_median, md_median_bad, disp = evaluateTrainedRewardModel(model, test_dataloader, token_false_id, token_true_id)
 print(hpc)
-print(md)
+print(md_good_median)
+print(md_median_bad)
 print(disp)

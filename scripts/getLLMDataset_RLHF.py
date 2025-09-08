@@ -1,8 +1,12 @@
 from openai import OpenAI
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm
+from peft import PeftModel
+from modelscope import AutoModelForCausalLM, AutoTokenizer
 import os
+import torch
 
+from scripts.settings import device, llm_modelname
 from .config import API_KEY, BASE_URL
 
 client = OpenAI(
@@ -155,6 +159,47 @@ def getBadPrompt(query, doc):
 """
     return prompt
 
+@torch.no_grad()
+def getMedianAnswer(llm, query, doc):
+    question = f"Based on the content:{doc}\nAnswer the Question:{query}\n/no_think"
+    messages = [
+        {"role": "user", "content": question}
+    ]
+    text = llm_tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False
+    )
+    model_inputs = llm_tokenizer([text], return_tensors="pt").to(llm.device)
+    generated_ids = llm.generate(
+        **model_inputs,
+        max_new_tokens=32768
+    )
+    output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist() 
+
+    try:
+        index = len(output_ids) - output_ids[::-1].index(151668)
+    except ValueError:
+        index = 0
+
+    answer = llm_tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+    return answer
+
+llm = AutoModelForCausalLM.from_pretrained(
+    llm_modelname,
+    device_map=device,
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=True
+)
+llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname, trust_remote_code=True)
+
+llm = PeftModel.from_pretrained(
+    llm, 
+    "weight/LLM_SFT"
+).to(device)
+llm.eval()
+
 data=[]
 df=pd.read_csv("data/RetrieverDataset_cleaned.csv")
 
@@ -167,6 +212,7 @@ for i in tqdm(range(df.shape[0])):
         goodPrompt=getGoodPrompt(query, doc)
         badPrompt=getBadPrompt(query, doc)
         goodResult = generate_with_qwen(goodPrompt)
+        medianResult= getMedianAnswer(llm, query, doc)
         badResult = generate_with_qwen(badPrompt)
         d=[query, doc, goodResult, badResult]
         data.append(d)
@@ -176,17 +222,17 @@ for i in tqdm(range(df.shape[0])):
         print(goodResult)
         print(badResult)
         if goodResult and badResult:
-            d=[query, doc, goodResult, badResult]
+            d=[query, doc, goodResult, medianResult,badResult]
             data.append(d)
     if i%100 == 99:
-        columns = ["query", "doc", "answer_good", "answer_bad"]
+        columns = ["query", "doc", "answer_good", "answer_median", "answer_bad"]
         RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
         file_path = "data/LLMDataset_RLHF.csv"
         header = not os.path.exists(file_path)
         RetrieverData_selfinstruct.to_csv(file_path, mode="a", index=False, header=header, encoding="utf-8-sig")
         data = []
     
-columns = ["query", "doc", "answer_good", "answer_bad"]
+columns = ["query", "doc", "answer_good", "answer_median", "answer_bad"]
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
 file_path = "data/LLMDataset_RLHF.csv"
 header = not os.path.exists(file_path)
