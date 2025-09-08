@@ -258,7 +258,6 @@ def drawLoss(saveName, TrainLoss, TestLoss):
 
 @torch.no_grad()
 def getReward(model, tokenizer, query,answers, token_false_id, token_true_id):
-    model.eval()
     task = 'Given a legal question, please answer it.'
     system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency.Note that the answer can only be \"yes\" or \"no\"."
 
@@ -277,5 +276,4 @@ def getReward(model, tokenizer, query,answers, token_false_id, token_true_id):
     true_vector = scores[:, token_true_id]
     false_vector = scores[:, token_false_id]
     r = torch.sigmoid(true_vector-false_vector)
-    model.train()
     return r
