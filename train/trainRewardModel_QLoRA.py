@@ -114,7 +114,6 @@ TestLoss = []
 TrainLoss.append(evaluateRewardModel(model, train_dataloader, token_false_id, token_true_id))
 TestLoss.append(evaluateRewardModel(model, test_dataloader, token_false_id, token_true_id))
 best_testloss=TestLoss[0]
-drawLoss('RewardModel_QLoRA', TrainLoss, TestLoss)
 
 for epoch in tqdm(range(n_epoch), desc="Training"):
     trainloss=0
@@ -144,7 +143,6 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
     tqdm.write(f"Epoch {epoch}: Training Loss = {trainloss:.4f}, Test loss = {testloss:.4f}")
     TrainLoss.append(trainloss)
     TestLoss.append(testloss)
-    drawLoss('RewardModel_QLoRA', TrainLoss, TestLoss)
 
     if testloss < best_testloss:
         best_testloss = testloss
