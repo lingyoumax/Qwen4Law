@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 import numpy as np
 
-from .settings import device, num_negative_docs
+from .settings import device, num_negative_docs, rewardmodel_max_length
 
 def getFiles(directory='data/laws', fileend='.txt'):
     # 获取文件夹下指定后缀的所有文件的文件名
@@ -255,3 +255,27 @@ def drawLoss(saveName, TrainLoss, TestLoss):
     plt.ylabel("Loss of Test Set")
 
     plt.savefig(f"figs/{saveName}.svg")
+
+@torch.no_grad()
+def getReward(model, tokenizer, query,answers, token_false_id, token_true_id):
+    model.eval()
+    task = 'Given a legal question, please answer it.'
+    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency.Note that the answer can only be \"yes\" or \"no\"."
+
+    def build_prompt(ans: str) -> str:
+        return (
+            f"<|im_start|>system\n{system}<|im_end|>\n"
+            f"<|im_start|>user\n<Instruct>: {task}\n<Query>: {query}\n<Answer>: {ans}<|im_end|>\n"
+            f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        )
+
+    prompts = [build_prompt(a) for a in answers]
+    enc = tokenizer(
+        prompts, padding=True, truncation=True, max_length=rewardmodel_max_length, return_tensors="pt"
+    ).to(model.device)
+    scores = model(**enc).logits[:, -1, :]
+    true_vector = scores[:, token_true_id]
+    false_vector = scores[:, token_false_id]
+    r = torch.sigmoid(true_vector-false_vector)
+    model.train()
+    return r

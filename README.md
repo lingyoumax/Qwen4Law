@@ -126,13 +126,14 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 ## Reward Model
 在测试集上分别使用HPC（人类偏好一致性）、MD（均值差）和Disp（合并标准差）来评估奖励模型。
 $$HPC=E[𝟙_{R^+}(r^+-r^-)],MD=E[r^+-r^-],Disp=\sqrt{\frac{\sigma (r^+)^2+\sigma (r^-)^2}{2}}$$
-其中，$𝟙,\sigma$分别为指示函数、标准差函数
+
 |Model| HPC | MD | Disp |
 |---|---|---|---|
 |Base|0.8855|0.13909377606213102|0.09623180495273174|
 |QLoRA|1.0| 0.9968128237673659| 0.02908888012174566|
 
-
+微调训练过程中的Loss曲线：
+![RewardModel_QLoRA](figs/RewardModel_QLoRA.svg)
 # 过程中的思考：
 
 ## 总方向
