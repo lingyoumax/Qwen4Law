@@ -77,11 +77,11 @@ $$\begin{align*}
 &\text{令} s=l_{yes}-l_{no}\\
 &\therefore r=sigmoid(s)\\
 &\text{将}r^+\text{和}r^-\text{代入交叉熵计算公式，可得}\\
-&MSE^+=-E[1*\log(r^+)+0*\log(1-r^+)]=-E[log(r^+)]\\
-&MSE^-=-E[0*\log(r^-)+1*\log(1-r^-)]=-E[log(1-r^-)]\\
-&\therefore Loss = MSE^++MSE^-=-E[log(r^+)+log(1-r^-)]\\
+&BCE^+=-E[1*\log(r^+)+0*\log(1-r^+)]=-E[log(r^+)]\\
+&BCE^-=-E[0*\log(r^-)+1*\log(1-r^-)]=-E[log(1-r^-)]\\
+&\therefore Loss = BCE^++BCE^-=-E[log(r^+)+log(1-r^-)]\\
 &\text{将}r=sigmoid(s)\text{和}s=l_{yes}-l_{no}\text{代入，可得}\\
-&\therefore Loss=-E[log(sigmoid(l^+_{yes}-l^+_{no}))+log(1-sigmoid(l^-_{yes}-l^-_{no}))]
+&Loss=-E[log(sigmoid(l^+_{yes}-l^+_{no}))+log(1-sigmoid(l^-_{yes}-l^-_{no}))]
 \end{align*}$$
 
 其中，$l_{yes}$和$l_{no}$分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表中的值。
