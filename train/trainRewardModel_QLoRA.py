@@ -13,7 +13,7 @@ from scripts.settings import random_seed, rewardmodel_test_ratio, device, reward
 from scripts.tools import evaluateRewardModel, drawLoss
 
 lr = 1e-5
-n_epoch = 5
+n_epoch = 10
 savePath = "weight/RewardModel_QLoRA"
 os.makedirs(savePath, exist_ok=True)
 
@@ -121,13 +121,19 @@ best_testloss=TestLoss[0]
 
 for epoch in tqdm(range(n_epoch), desc="Training"):
     trainloss=0
-    for batch in train_dataloader:
+    for batch in tqdm(train_dataloader):
         optimizer.zero_grad()
         good_prompt_dict=BatchEncoding({"input_ids":batch["good_prompt_input_ids"],"attention_mask":batch["good_prompt_attention_mask"]})
         good_batch_scores = model(**good_prompt_dict).logits[:, -1, :]
         good_true_vector = good_batch_scores[:, token_true_id]
         good_false_vector = good_batch_scores[:, token_false_id]
         good_s = good_true_vector - good_false_vector
+
+        median_prompt_dict=BatchEncoding({"input_ids":batch["median_prompt_input_ids"],"attention_mask":batch["median_prompt_attention_mask"]})
+        median_batch_scores = model(**median_prompt_dict).logits[:, -1, :]
+        median_true_vector = median_batch_scores[:, token_true_id]
+        median_false_vector = median_batch_scores[:, token_false_id]
+        median_s = median_true_vector - median_false_vector
 
         bad_prompt_dict=BatchEncoding({"input_ids":batch["bad_prompt_input_ids"],"attention_mask":batch["bad_prompt_attention_mask"]})
         bad_batch_scores = model(**bad_prompt_dict).logits[:, -1, :]
@@ -136,8 +142,11 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         bad_s = bad_true_vector - bad_false_vector
         
         good_loss = -torch.mean(torch.log(torch.sigmoid(good_s)))
+        median_loss = -torch.mean(torch.log(1-torch.abs(0.5-torch.sigmoid(median_s))))
         bad_loss = -torch.mean(torch.log(1-torch.sigmoid(bad_s)))
-        loss=good_loss+bad_loss
+        good_median_loss = -torch.mean(torch.log(torch.clamp(torch.sigmoid(good_s)-torch.sigmoid(median_s),min=1e-8,max=0.5)))
+        median_bad_loss = -torch.mean(torch.log(torch.clamp(torch.sigmoid(median_s)-torch.sigmoid(bad_s),min=1e-8,max=0.5)))
+        loss=good_loss+median_loss+bad_loss+good_median_loss+median_bad_loss
         loss.backward()
         optimizer.step()
         trainloss=trainloss+loss.item()

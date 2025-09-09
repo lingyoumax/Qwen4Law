@@ -197,7 +197,9 @@ def evaluateRewardModel(model, dataloader, token_false_id, token_true_id):
             good_loss = -torch.sum(torch.log(torch.sigmoid(good_s)))
             median_loss = -torch.sum(torch.log(1-torch.abs(0.5-torch.sigmoid(median_s))))
             bad_loss = -torch.sum(torch.log(1-torch.sigmoid(bad_s)))
-            loss=good_loss+median_loss+bad_loss
+            good_median_loss = -torch.sum(torch.log(torch.clamp(torch.sigmoid(good_s)-torch.sigmoid(median_s),min=1e-8,max=0.5)))
+            median_bad_loss = -torch.sum(torch.log(torch.clamp(torch.sigmoid(median_s)-torch.sigmoid(bad_s),min=1e-8,max=0.5)))
+            loss=good_loss+median_loss+bad_loss+good_median_loss+median_bad_loss
             l = l + loss.item()
             total = total + B
             
