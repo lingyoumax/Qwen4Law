@@ -149,13 +149,13 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 ## Reward Model
 在测试集上分别使用HPC（人类偏好一致性）、MD（均值差）和Disp（合并标准差）来评估奖励模型。
 
-$HPC=E[𝟙_{R^+}(r^{good}-r^{median})\&𝟙_{R^+}(r^{median}-r^{bad})]$
+- $HPC=E[𝟙_{R^+}(r^{good}-r^{median})\&𝟙_{R^+}(r^{median}-r^{bad})]$
 
-$MD_{good,median}=E[r^{good}-r^{median}]$
+- $MD_{good,median}=E[r^{good}-r^{median}]$
 
-$MD_{median,bad}=E[r^{median}-r^{bad}]$
+- $MD_{median,bad}=E[r^{median}-r^{bad}]$
 
-$Disp=\sqrt{\frac{\sigma (r^{good})^2+\sigma (r^{median})^2+\sigma (r^{bad})^2}{3}}$
+- $Disp=\sqrt{\frac{\sigma (r^{good})^2+\sigma (r^{median})^2+\sigma (r^{bad})^2}{3}}$
 
 |Model| $HPC$ | $MD_{good,median}$ | $MD_{median,bad}$ | Disp |
 |---|---|---|---| --- |
