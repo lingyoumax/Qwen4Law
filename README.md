@@ -84,22 +84,30 @@
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 
 损失函数设计如下：
-$$\begin{align*}
-&\because r=\frac{e^{l_{yes}}}{e^{l_{yes}}+e^{l_{no}}}=\frac{1}{1+e^{-(l_{yes}-l_{no})}}=sigmoid(l_{yes}-l_{no})\\
-&\text{令} s=l_{yes}-l_{no}\\
-&\therefore r=sigmoid(s)\\
-&\text{将}r^{good}\text{和}r^{bad}\text{代入交叉熵计算公式，可得}\\
-&Loss^{good}=-E[1*\log(r^{good})+0*\log(1-r^{good})]=-E[log(r^{good})]\\
-&Loss^{bad}=-E[0*\log(r^{bad})+1*\log(1-r^{bad})]=-E[log(1-r^{bad})]\\
-&\text{引入了}Loss^{median},\text{它和}Loss^{good},Loss^{bad}\text{在量纲上保持一致}\\
-&Loss^{median}=-E[log(1-|0.5-r^{median}|)]\\
-&\text{同时，为了进一步强化}r^{good},r^{median}\text{和}r^{bad}\text{三者之间的排序，引入了它们之间的距离损失}\\
-&Loss^{good,median}=-E[log(min(0.5,max(0,r^{good}-r^{median})))]\\
-&Loss^{median,bad}=-E[log(min(0.5,max(0,r^{median}-r^{bad})))]\\
-&\therefore Loss =Loss^{good} + Loss^{median} + Loss^{bad} +Loss^{good,median}+ Loss^{median,bad}\\
-\end{align*}$$
+- 因为  
+  $$
+  r = \frac{e^{l_{yes}}}{e^{l_{yes}}+e^{l_{no}}}
+  = \frac{1}{1+e^{-(l_{yes}-l_{no})}}
+  = \sigma(l_{yes}-l_{no})
+  $$
+- 令 $s = l_{yes} - l_{no}$  
+  所以 $r = \sigma(s)$
 
-其中，$l_{yes}$和$l_{no}$分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表中的值。
+- 交叉熵损失：  
+  $Loss^{good} = -E[\log(r^{good})]$  
+  $Loss^{bad} = -E[\log(1-r^{bad})]$
+
+- 中间项损失：  
+  $Loss^{median} = -E[\log(1-|0.5-r^{median}|)]$
+
+- 排序损失：  
+  $Loss^{good,median} = -E[\log(\min(0.5,\max(0,r^{good}-r^{median})))]$  
+  $Loss^{median,bad} = -E[\log(\min(0.5,\max(0,r^{median}-r^{bad})))]$
+
+- 总损失：  
+  $Loss = Loss^{good} + Loss^{median} + Loss^{bad} + Loss^{good,median} + Loss^{median,bad}$
+
+其中，$l_{yes}$和$l_{no}$分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表预测值中的值。
 
 # 结果及分析
 
