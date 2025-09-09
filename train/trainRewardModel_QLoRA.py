@@ -13,7 +13,7 @@ from scripts.settings import random_seed, rewardmodel_test_ratio, device, reward
 from scripts.tools import evaluateRewardModel, drawLoss
 
 lr = 1e-5
-n_epoch = 10
+n_epoch = 5
 savePath = "weight/RewardModel_QLoRA"
 os.makedirs(savePath, exist_ok=True)
 
