@@ -84,12 +84,7 @@
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 
 损失函数设计如下：
-- 因为  
-  $$
-  r = \frac{e^{l_{yes}}}{e^{l_{yes}}+e^{l_{no}}}
-  = \frac{1}{1+e^{-(l_{yes}-l_{no})}}
-  = \sigma(l_{yes}-l_{no})
-  $$
+- 因为 $r = \frac{e^{l_{yes}}}{e^{l_{yes}}+e^{l_{no}}}= \frac{1}{1+e^{-(l_{yes}-l_{no})}}= \sigma(l_{yes}-l_{no})$
 - 令 $s = l_{yes} - l_{no}$  
   所以 $r = \sigma(s)$
 
@@ -149,7 +144,7 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 ## Reward Model
 在测试集上分别使用HPC（人类偏好一致性）、MD（均值差）和Disp（合并标准差）来评估奖励模型。
 
-- $HPC=E[𝟙_{R^+}(r^{good}-r^{median})\&𝟙_{R^+}(r^{median}-r^{bad})]$
+- $HPC=E[1_{R^+}(r^{good}-r^{median})\&1_{R^+}(r^{median}-r^{bad})]$
 
 - $MD_{good,median}=E[r^{good}-r^{median}]$
 
