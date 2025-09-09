@@ -102,7 +102,7 @@
 - 总损失：  
   $Loss = Loss^{good} + Loss^{median} + Loss^{bad} + Loss^{good,median} + Loss^{median,bad}$
 
-其中，$l_{yes}$ 和 $l_{no}$ 分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表预测值中的值。
+其中， $l_{yes}$ 和 $l_{no}$ 分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表预测值中的值。
 
 # 结果及分析
 
