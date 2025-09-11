@@ -13,7 +13,7 @@ from scripts.settings import random_seed, rewardmodel_test_ratio, device, reward
 from scripts.tools import evaluateRewardModel, drawLoss
 
 lr = 1e-5
-n_epoch = 5
+n_epoch = 20
 savePath = "weight/RewardModel_QLoRA"
 os.makedirs(savePath, exist_ok=True)
 
@@ -21,17 +21,16 @@ df = pd.read_csv("data/LLMDataset_RLHF.csv", encoding="utf-8-sig")
 
 prefix = "<|im_start|>system\nEvaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
 suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
-task = 'Given a legal question, please answer it.'
 
-def format_instruction(instruction, query, answer):
-    output = "<Instruct>: {instruction}\n<Query>: {query}\n<Answer>: {answer}".format(instruction=instruction,query=query, answer=answer)
+def format_instruction(query, doc, answer):
+    output = f"<Query>: Based on the content:{doc}\nAnswer the Question:{query}\n/no_think\n<Answer>: {answer}"
     return output
 
 def row_to_sample(row):
     return {
-        "good_prompt": prefix + format_instruction(task,row["query"],row["answer_good"]) + suffix,
-        "median_prompt": prefix + format_instruction(task,row["query"],row["answer_median"]) + suffix,
-        "bad_prompt": prefix + format_instruction(task,row["query"],row["answer_bad"]) + suffix
+        "good_prompt": prefix + format_instruction(row["query"],row['doc'],row["answer_good"]) + suffix,
+        "median_prompt": prefix + format_instruction(row["query"],row['doc'],row["answer_median"]) + suffix,
+        "bad_prompt": prefix + format_instruction(row["query"],row['doc'],row["answer_bad"]) + suffix
     }
 
 dataset = Dataset.from_list([row_to_sample(row) for _, row in df.iterrows()])

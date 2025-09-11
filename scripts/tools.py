@@ -280,14 +280,14 @@ def drawLoss(saveName, TrainLoss, TestLoss):
     plt.savefig(f"figs/{saveName}.svg")
 
 @torch.no_grad()
-def getReward(model, tokenizer, query,answers, token_false_id, token_true_id):
+def getReward(model, tokenizer, query, doc, answers, token_false_id, token_true_id):
     task = 'Given a legal question, please answer it.'
-    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency.Note that the answer can only be \"yes\" or \"no\"."
+    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer: An answer is \"Good\" if it provides specific, fact-based details tied to the user’s question, addresses their core need (e.g., judging legality, guiding next steps) with actionable advice, and shows domain expertise; it is \"Bad\" if it uses vague/unsubstantiated content and offers no substantive help (e.g., only generic suggestions like \"ask authorities\"). Note that the answer can only be \"yes\" or \"no\"."
 
-    def build_prompt(ans: str) -> str:
+    def build_prompt(answer: str) -> str:
         return (
             f"<|im_start|>system\n{system}<|im_end|>\n"
-            f"<|im_start|>user\n<Instruct>: {task}\n<Query>: {query}\n<Answer>: {ans}<|im_end|>\n"
+            f"<|im_start|>user\n<Query>: Based on the content:{doc}\nAnswer the Question:{query}\n/no_think\n<Answer>: {answer}"
             f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
         )
 

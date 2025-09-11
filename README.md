@@ -53,7 +53,7 @@
 ![evalLLMTokenLength](figs/evalLLMTokenLength.jpg)
 ### Model
 
-使用Qwen3-8B架构，采取以下技术路线进行对比实验：
+使用Qwen3-8B架构，采取以下技术路线进行实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 ## Reward Model
@@ -79,7 +79,7 @@
 ### Model
 输入问答对之后，通过提示词方式让LLM判断这个回答是否是一个好回答，是的话就输出"yes"，不是的话就输出"no"，通过比较LLM对这两个Token的预测值，来评价该模型的得分$r$
 
-使用Qwen3-0.6B架构，采取以下技术路线进行对比实验：
+使用Qwen3-0.6B架构，采取以下技术路线进行实验：
 
 - QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
 
@@ -103,6 +103,22 @@
   $Loss = Loss^{good} + Loss^{median} + Loss^{bad} + Loss^{good,median} + Loss^{median,bad}$
 
 其中， $l_{yes}$ 和 $l_{no}$ 分别为输入问题和回答之后，llm输出的yes和no在第一个token对应的词表预测值中的值。
+
+## LLM-RLHF
+### 数据集
+使用微调reward model的数据集
+
+### Tokenizer
+同样使用了预训练模型自带的tokenizer。
+
+### Model
+采取以下技术路线进行实验：
+
+- QLoRA微调：微调模型中的q_proj、k_proj、v_proj、o_proj参数矩阵
+
+同时，分别实现了以下强化学习方法：
+
+- GRPO
 
 # 结果及分析
 
@@ -154,11 +170,18 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
 |Model| $HPC$ | $MD_{good,median}$ | $MD_{median,bad}$ | Disp |
 |---|---|---|---| --- |
-|Base|0.2045|-0.05423529581725606|0.19332906959205864| 0.0884952054508359 |
-|QLoRA|0.9965| 0.8178920228201896| 0.12822304902785892| 0.06799963857472005 |
+|Base|0.018|-0.17228601189510662|0.28038091877847904| 0.1482905490664649 |
+|QLoRA|1.0| 0.6704097773432731| 0.32506575200171856| 0.022575522848368217 |
 
 微调训练过程中的Loss曲线：
 ![RewardModel_QLoRA](figs/RewardModel_QLoRA.svg)
+
+## LLM-RLHF
+|Model|Average Reward |
+|---|---|
+|Base|-|
+|GRPO|-|
+
 # 过程中的思考：
 - 为什么使用RAG？
   - 因为法律规定过几年会改变，如果使用RAG的形式，可以直接修改知识库。而如果只微调模型让其记住这些法律知识，那么就需要将整个模型重新微调才能记住新的法律，并且可能会遗留下旧版本的法律的记忆。
