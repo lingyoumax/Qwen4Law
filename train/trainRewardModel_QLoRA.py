@@ -29,7 +29,6 @@ def format_instruction(query, doc, answer):
 def row_to_sample(row):
     return {
         "good_prompt": prefix + format_instruction(row["query"],row['doc'],row["answer_good"]) + suffix,
-        "median_prompt": prefix + format_instruction(row["query"],row['doc'],row["answer_median"]) + suffix,
         "bad_prompt": prefix + format_instruction(row["query"],row['doc'],row["answer_bad"]) + suffix
     }
 
@@ -54,8 +53,8 @@ model = AutoModelForCausalLM.from_pretrained(
 model = prepare_model_for_kbit_training(model,gradient_checkpointing_kwargs={"use_reentrant":False})
 
 lora_config = LoraConfig(
-    r=8,
-    lora_alpha=16,
+    r=16,
+    lora_alpha=32,
     target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
     lora_dropout=0.1,
     bias="none",
@@ -69,14 +68,11 @@ tokenizer = AutoTokenizer.from_pretrained(rewardmodel_modelname, padding_side='l
 
 def tokenize_function(example):
     good_prompt = tokenizer(example["good_prompt"], padding="max_length", truncation=True, max_length=rewardmodel_max_length, return_tensors="pt")
-    median_prompt = tokenizer(example["median_prompt"], padding="max_length", truncation=True, max_length=rewardmodel_max_length, return_tensors="pt")
     bad_prompt = tokenizer(example["bad_prompt"], padding="max_length", truncation=True, max_length=rewardmodel_max_length, return_tensors="pt")
 
     features = {
         "good_prompt_input_ids": good_prompt["input_ids"][0],
         "good_prompt_attention_mask": good_prompt["attention_mask"][0],
-        "median_prompt_input_ids": median_prompt["input_ids"][0],
-        "median_prompt_attention_mask": median_prompt["attention_mask"][0],
         "bad_prompt_input_ids": bad_prompt["input_ids"][0],
         "bad_prompt_attention_mask": bad_prompt["attention_mask"][0]
     }
@@ -116,6 +112,7 @@ TrainLoss = []
 TestLoss = []
 TrainLoss.append(evaluateRewardModel(model, train_dataloader, token_false_id, token_true_id))
 TestLoss.append(evaluateRewardModel(model, test_dataloader, token_false_id, token_true_id))
+
 best_testloss=TestLoss[0]
 
 for epoch in tqdm(range(n_epoch), desc="Training"):
@@ -128,12 +125,6 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         good_false_vector = good_batch_scores[:, token_false_id]
         good_s = good_true_vector - good_false_vector
 
-        median_prompt_dict=BatchEncoding({"input_ids":batch["median_prompt_input_ids"],"attention_mask":batch["median_prompt_attention_mask"]})
-        median_batch_scores = model(**median_prompt_dict).logits[:, -1, :]
-        median_true_vector = median_batch_scores[:, token_true_id]
-        median_false_vector = median_batch_scores[:, token_false_id]
-        median_s = median_true_vector - median_false_vector
-
         bad_prompt_dict=BatchEncoding({"input_ids":batch["bad_prompt_input_ids"],"attention_mask":batch["bad_prompt_attention_mask"]})
         bad_batch_scores = model(**bad_prompt_dict).logits[:, -1, :]
         bad_true_vector = bad_batch_scores[:, token_true_id]
@@ -141,11 +132,8 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
         bad_s = bad_true_vector - bad_false_vector
         
         good_loss = -torch.mean(torch.log(torch.sigmoid(good_s)))
-        median_loss = -torch.mean(torch.log(1-torch.abs(0.5-torch.sigmoid(median_s))))
         bad_loss = -torch.mean(torch.log(1-torch.sigmoid(bad_s)))
-        good_median_loss = -torch.mean(torch.log(torch.clamp(torch.sigmoid(good_s)-torch.sigmoid(median_s),min=1e-8,max=0.5)))
-        median_bad_loss = -torch.mean(torch.log(torch.clamp(torch.sigmoid(median_s)-torch.sigmoid(bad_s),min=1e-8,max=0.5)))
-        loss=good_loss+median_loss+bad_loss+good_median_loss+median_bad_loss
+        loss=good_loss+bad_loss
         loss.backward()
         optimizer.step()
         trainloss=trainloss+loss.item()
@@ -155,7 +143,6 @@ for epoch in tqdm(range(n_epoch), desc="Training"):
     tqdm.write(f"Epoch {epoch}: Training Loss = {trainloss:.4f}, Test loss = {testloss:.4f}")
     TrainLoss.append(trainloss)
     TestLoss.append(testloss)
-
     if testloss < best_testloss:
         best_testloss = testloss
         model.save_pretrained(savePath)

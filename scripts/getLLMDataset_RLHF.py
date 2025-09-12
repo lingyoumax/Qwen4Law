@@ -107,60 +107,8 @@ def getGoodPrompt(query, doc):
 """
     return prompt
 
-def getBadPrompt(query, doc):
-    prompt=f"""
-# 角色与任务
-你需要模拟“不够专业、不够完善”的法律回答者，基于用户问题（Question）和法律文档（Doc），生成质量较差的回答。该回答将作为“劣质回答”用于模型训练，需体现真实场景中常见的回答缺陷，但**不得包含法律错误**（如编造法条、错误解读强制性规定）。
-
-# 输入信息
-<用户问题>
-{query}
-</用户问题>
-
-<法律文档>
-{doc}
-</法律文档>
-
-# 劣质回答的核心特征（需至少满足2项）
-1. **信息不完整**：
-   - 遗漏文档中的关键条款（如只说“可以辞退”，不提“需说明理由”）；
-   - 省略问题中的核心要素（如用户问“是否合法”，只回答“看情况”，不解释具体情况）。
-
-2. **表述模糊**：
-   - 使用“可能”“大概”“也许”等不确定词汇（如“公司可能合法，也可能不合法”）；
-   - 回避明确结论（如“这个问题比较复杂，建议咨询律师”）。
-
-3. **缺乏实用性**：
-   - 只讲法律规定，不提供任何可操作建议（如不提“如何维权”“需要什么证据”）；
-   - 建议过于笼统（如“你可以去告公司”，不说明“去哪里告、需要准备什么”）。
-
-4. **结构混乱**：
-   - 关键信息后置（如先讲无关细节，最后才回答“是否合法”）；
-   - 逻辑跳跃（如突然从“辞退合法性”跳到“工资计算”，无过渡）。
-
-5. **术语误用或口语化过度**：
-   - 用错误术语（如将“劳动仲裁”说成“法院调解”）；
-   - 过度口语化导致不严谨（如“公司辞你没毛病”“不服就去闹”）。
-
-# 严格禁止
-- 生成与文档冲突的法律错误（如文档明确“需说明理由”，却回答“公司可以不解释”）；
-- 包含违法建议（如“去公司闹事逼他们赔偿”）；
-- 完全脱离问题或文档（如用户问辞退合法性，却回答“劳动合同怎么签”）。
-
-# 示例（基于输入的问题和文档）
-【劣质回答示例】
-- “试用期被辞退很常见，应该是合法的吧。”（模糊表述+信息不完整）
-- “公司可以辞退你，具体原因你自己想。”（缺乏实用性+术语不规范）
-- “这个问题不好说，可能合法可能不合法，你自己看着办。”（回避结论+无依据）
-
-# 输出要求
-- 直接输出回答内容，无需前缀或格式标记；
-- 长度与“优质回答”相近（避免过短或过长），看起来像“真实但不够好”的回答。
-"""
-    return prompt
-
 @torch.no_grad()
-def getMedianAnswer(llm, query, doc):
+def getBadAnswer(llm, query, doc):
     question = f"Based on the content:{doc}\nAnswer the Question:{query}\n/no_think"
     messages = [
         {"role": "user", "content": question}
@@ -210,10 +158,8 @@ for i in tqdm(range(df.shape[0])):
     try:
         query = generate_with_qwen(queryPrompt)
         goodPrompt=getGoodPrompt(query, doc)
-        badPrompt=getBadPrompt(query, doc)
         goodResult = generate_with_qwen(goodPrompt)
-        medianResult= getMedianAnswer(llm, query, doc)
-        badResult = generate_with_qwen(badPrompt)
+        badResult= getBadAnswer(llm, query, doc)
         d=[query, doc, goodResult, badResult]
         data.append(d)
     except Exception as e:
@@ -222,17 +168,17 @@ for i in tqdm(range(df.shape[0])):
         print(goodResult)
         print(badResult)
         if goodResult and badResult:
-            d=[query, doc, goodResult, medianResult,badResult]
+            d=[query, doc, goodResult,badResult]
             data.append(d)
     if i%100 == 99:
-        columns = ["query", "doc", "answer_good", "answer_median", "answer_bad"]
+        columns = ["query", "doc", "answer_good", "answer_bad"]
         RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
         file_path = "data/LLMDataset_RLHF.csv"
         header = not os.path.exists(file_path)
         RetrieverData_selfinstruct.to_csv(file_path, mode="a", index=False, header=header, encoding="utf-8-sig")
         data = []
     
-columns = ["query", "doc", "answer_good", "answer_median", "answer_bad"]
+columns = ["query", "doc", "answer_good", "answer_bad"]
 RetrieverData_selfinstruct = pd.DataFrame(data, columns=columns)
 file_path = "data/LLMDataset_RLHF.csv"
 header = not os.path.exists(file_path)

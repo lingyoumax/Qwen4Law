@@ -181,12 +181,6 @@ def evaluateRewardModel(model, dataloader, token_false_id, token_true_id):
             good_false_vector = good_batch_scores[:, token_false_id]
             good_s = good_true_vector - good_false_vector
 
-            median_prompt_dict=BatchEncoding({"input_ids":batch["median_prompt_input_ids"],"attention_mask":batch["median_prompt_attention_mask"]})
-            median_batch_scores = model(**median_prompt_dict).logits[:, -1, :]
-            median_true_vector = median_batch_scores[:, token_true_id]
-            median_false_vector = median_batch_scores[:, token_false_id]
-            median_s = median_true_vector - median_false_vector
-
             bad_prompt_dict=BatchEncoding({"input_ids":batch["bad_prompt_input_ids"],"attention_mask":batch["bad_prompt_attention_mask"]})
             bad_batch_scores = model(**bad_prompt_dict).logits[:, -1, :]
             bad_true_vector = bad_batch_scores[:, token_true_id]
@@ -195,11 +189,8 @@ def evaluateRewardModel(model, dataloader, token_false_id, token_true_id):
 
             B = bad_s.size(0)
             good_loss = -torch.sum(torch.log(torch.sigmoid(good_s)))
-            median_loss = -torch.sum(torch.log(1-torch.abs(0.5-torch.sigmoid(median_s))))
             bad_loss = -torch.sum(torch.log(1-torch.sigmoid(bad_s)))
-            good_median_loss = -torch.sum(torch.log(torch.clamp(torch.sigmoid(good_s)-torch.sigmoid(median_s),min=1e-8,max=0.5)))
-            median_bad_loss = -torch.sum(torch.log(torch.clamp(torch.sigmoid(median_s)-torch.sigmoid(bad_s),min=1e-8,max=0.5)))
-            loss=good_loss+median_loss+bad_loss+good_median_loss+median_bad_loss
+            loss=good_loss+bad_loss
             l = l + loss.item()
             total = total + B
             
@@ -212,7 +203,6 @@ def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id)
     total = 0
     hpc_count = 0
     good_scores=[]
-    median_scores=[]
     bad_scores=[]
     with torch.inference_mode():
         for batch in tqdm(dataloader):
@@ -223,13 +213,6 @@ def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id)
             good_batch_scores = torch.stack([good_false_vector, good_true_vector], dim=1)
             good_score=torch.nn.functional.softmax(good_batch_scores, dim=1)[:, 1]
 
-            median_prompt_dict=BatchEncoding({"input_ids":batch["median_prompt_input_ids"],"attention_mask":batch["median_prompt_attention_mask"]})
-            median_batch_scores = model(**median_prompt_dict).logits[:, -1, :]
-            median_true_vector = median_batch_scores[:, token_true_id]
-            median_false_vector = median_batch_scores[:, token_false_id]
-            median_batch_scores = torch.stack([median_false_vector, median_true_vector], dim=1)
-            median_score=torch.nn.functional.softmax(median_batch_scores, dim=1)[:, 1]
-
             bad_prompt_dict=BatchEncoding({"input_ids":batch["bad_prompt_input_ids"],"attention_mask":batch["bad_prompt_attention_mask"]})
             bad_batch_scores = model(**bad_prompt_dict).logits[:, -1, :]
             bad_true_vector = bad_batch_scores[:, token_true_id]
@@ -238,31 +221,25 @@ def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id)
             bad_score=torch.nn.functional.softmax(bad_batch_scores, dim=1)[:, 1]
 
             B = good_score.size(0)
-            hpc_count += torch.logical_and(good_score > median_score, median_score > bad_score).int().sum().item()
+            hpc_count += (good_score > bad_score).int().sum().item()
             total = total + B
             good_scores.extend(good_score.tolist())
-            median_scores.extend(median_score.tolist())
             bad_scores.extend(bad_score.tolist())
             
     model.train()
     hpc = hpc_count / total if total > 0 else 0.0
     good_scores_np = np.array(good_scores)
-    median_scores_np = np.array(median_scores)
     bad_scores_np = np.array(bad_scores)
     
     mean_good = np.mean(good_scores_np)
-    mean_median = np.mean(median_scores_np)
     mean_bad = np.mean(bad_scores_np)
-    md_good_median = mean_good - mean_median
-    md_median_bad = mean_median - mean_bad
+    md = mean_good - mean_bad
 
     std_good = np.std(good_scores_np)
-    std_median = np.std(median_scores_np)
     std_bad = np.std(bad_scores_np)
     disp = np.sqrt((std_good**2 + std_bad**2) / 2)
-    disp = np.sqrt((std_good**2 + std_median**2 + std_bad**2) / 3)
 
-    return hpc, md_good_median, md_median_bad, disp
+    return hpc, md, disp
 
 def drawLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))
@@ -282,7 +259,7 @@ def drawLoss(saveName, TrainLoss, TestLoss):
 @torch.no_grad()
 def getReward(model, tokenizer, query, doc, answers, token_false_id, token_true_id):
     task = 'Given a legal question, please answer it.'
-    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer: An answer is \"Good\" if it provides specific, fact-based details tied to the user’s question, addresses their core need (e.g., judging legality, guiding next steps) with actionable advice, and shows domain expertise; it is \"Bad\" if it uses vague/unsubstantiated content and offers no substantive help (e.g., only generic suggestions like \"ask authorities\"). Note that the answer can only be \"yes\" or \"no\"."
+    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\"."
 
     def build_prompt(answer: str) -> str:
         return (

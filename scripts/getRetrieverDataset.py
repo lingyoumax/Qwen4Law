@@ -1,5 +1,4 @@
 from openai import OpenAI
-import config
 import pandas as pd
 import random
 from tqdm import tqdm

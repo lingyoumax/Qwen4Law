@@ -16,12 +16,12 @@ def format_instruction(query, doc, answer):
     output = f"<Query>: Based on the content:{doc}\nAnswer the Question:{query}\n/no_think\n<Answer>: {answer}"
     return output
 
-prefix = "<|im_start|>system\nEvaluate the given answer based on the question, and comprehensively assess whether it is a good answer: An answer is \"Good\" if it provides specific, fact-based details tied to the user’s question, addresses their core need (e.g., judging legality, guiding next steps) with actionable advice, and shows domain expertise; it is \"Bad\" if it uses vague/unsubstantiated content and offers no substantive help (e.g., only generic suggestions like \"ask authorities\"). Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
+prefix = "<|im_start|>system\nEvaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
 suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
 
 good_answer_token_len= [len(tokenizer(prefix+format_instruction(d["query"],d['doc'],d["answer_good"]), padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
 
-bad_answer_token_len= [len(tokenizer(prefix+format_instruction(d["query"],d['doc'],d["answer_good"]), padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
+bad_answer_token_len= [len(tokenizer(prefix+format_instruction(d["query"],d['doc'],d["answer_bad"]), padding=True, truncation=True, max_length=max_length, return_tensors="pt")["input_ids"][0]) for _, d in df.iterrows()]
 
 
 good_answer_mean = np.mean(good_answer_token_len)

@@ -1,6 +1,6 @@
 from datasets import Dataset
 import pandas as pd
-from modelscope import AutoConfig, AutoModel, AutoTokenizer
+from modelscope import AutoModel, AutoTokenizer
 from transformers import BatchEncoding
 import torch
 from torch.utils.data import DataLoader
