@@ -159,10 +159,10 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 
 - $Disp=\sqrt{\frac{\sigma (r^{good})^2+\sigma (r^{bad})^2}{2}}$
 
-|Model| $HPC$ | $MD$  | Disp |
+|Model| $HPC$ | $MD$  | $Disp$ |
 |---|---|---|---|
 |Base|0.0215|-0.17228601189510662| 0.12818141305963188 |
-|QLoRA|1.0| 0.6704097773432731| 0.022575522848368217 |
+|QLoRA|0.9925| 0.9662359705795388| 0.09514627235697912 |
 
 微调训练过程中的Loss曲线：
 ![RewardModel_QLoRA](figs/RewardModel_QLoRA.svg)
