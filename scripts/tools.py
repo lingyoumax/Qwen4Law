@@ -257,14 +257,13 @@ def drawLoss(saveName, TrainLoss, TestLoss):
     plt.savefig(f"figs/{saveName}.svg")
 
 @torch.no_grad()
-def getReward(model, tokenizer, query, doc, answers, token_false_id, token_true_id):
-    task = 'Given a legal question, please answer it.'
+def getReward(model, tokenizer, query, answers, token_false_id, token_true_id):
     system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\"."
 
     def build_prompt(answer: str) -> str:
         return (
             f"<|im_start|>system\n{system}<|im_end|>\n"
-            f"<|im_start|>user\n<Query>: Based on the content:{doc}\nAnswer the Question:{query}\n/no_think\n<Answer>: {answer}"
+            f"<|im_start|>user\n<Query>: {query}n<Answer>: {answer}"
             f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
         )
 
