@@ -12,7 +12,7 @@ from scripts.settings import llm_modelname, llm_test_ratio, random_seed, device
 f = pd.read_csv("data/LLMDataset_SFT.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
-    query=f"Answer the Question:{row['query']}\n/no_think"
+    query=f"Based on the content:{row['doc']}\nAnswer the Question:{row['query']}\n/no_think"
     return {
         "input": query,
         "output": row["answer"]
@@ -96,4 +96,4 @@ plt.xlabel('F1')
 plt.ylabel('Count')
 plt.legend(loc="upper left")
 
-plt.savefig("figs/evalLLM_based_0.svg")
+plt.savefig("figs/evalLLM_RAG.svg")

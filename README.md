@@ -144,7 +144,7 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 |RAG + SFT| 0.932 | 0.945 | 0.937 |
 
 基础模型输出与数据集answer的BERTScore分布：
-![evalLLM_based](figs/evalLLM_based.svg)
+![evalLLM_based_0](figs/evalLLM_based_0.svg)
 基础模型搭配RAG输出与数据集answer的BERTScore分布：
 ![evalLLM_RAG](figs/evalLLM_RAG.svg)
 微调模型搭配RAG输出与数据集answer的BERTScore分布：
