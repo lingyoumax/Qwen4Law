@@ -170,7 +170,7 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 ## LLM-RLHF
 |Model|Average Reward |
 |---|---|
-|Base|-|
+|Base|0.004355889458168235|
 |GRPO|-|
 
 # 过程中的思考：

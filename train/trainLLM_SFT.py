@@ -113,7 +113,6 @@ lora_config = LoraConfig(
     inference_mode=False,
 )
 model = get_peft_model(model, lora_config)
-model.print_trainable_parameters()
 
 training_args = TrainingArguments(
     output_dir=savePath,
