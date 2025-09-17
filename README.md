@@ -204,7 +204,7 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
   - SFT中的answer虽然正确，但是并没有在“人类主观体验”上优化
 - 为什么在强化学习中，需要对策略的更新幅度加以限制？
   - 在重要性采样中，$E_{x\sim p}[x]=E_{x\sim q}[\frac{p(x)}{q(x)}x]$
-  - $Var_{x\sim p}[x]=E_{x\sim p}[x^2]-(E_{x\sim p}[x])^2$，同时$Var_{x\sim q}[\frac{p(x)}{q(x)}x]=E_{x\sim q}[(\frac{p(x)}{q(x)}x)^2]-(E_{x\sim q}[\frac{p(x)}{q(x)}x])^2=E_{x\sim p}[\frac{p(x)}{q(x)}x^2]-(E_{x\sim p}[x])^2$。可以看出，当概率分布$p$和$q$差别过大时，采样的分布的方差与原分布的方差差距会变大。这也就要求我们必须要限制策略每次更新的幅度，不然采样的数据无法使用。
+  - $Var_{x\sim p}[x]=E_{x\sim p}[x^2]-(E_{x\sim p}[x])^2$，同时$Var_{x\sim q}[\frac{p(x)}{q(x)}x]=E_{x\sim q}[(\frac{p(x)}{q(x)}x)^2]-(E_{x\sim q}[\frac{p(x)}{q(x)}x])^2=E_{x\sim p}[\frac{p(x)}{q(x)}x^2]-(E_{x\sim p}[x])^2$。可以看出，当概率分布$p$和$q$差别过大时，采样的分布的方差与原分布的方差差距会变大。这也就要求我们必须要限制策略每次更新的幅度，不然当采样覆盖率不足时，采样的数据估计的期望值与原数据估计的期望值不一致，导致采样的数据无法使用。
 
 # 知识笔记
 
@@ -222,18 +222,19 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
     - 将相似向量的搜索范围缩小到该簇内的向量，而不是整个数据集。
 - ```Policy Gradient```：
 
-$\because R_{\theta}=E_{\tau \sim P_{\theta}}[R_{\theta}(\tau)]=\sum_{n_{\tau}}R(\tau)P_{\theta}(\tau)$
+$\because R_{\theta}=E_{\tau \sim P_{\theta}}[R(\tau)]=\sum_{n_{\tau}}R(\tau)P_{\theta}(\tau)$
 
 $\therefore \nabla R_{\theta}=\sum_{n_{\tau}}R(\tau)\nabla P_{\theta}(\tau)=\sum_{n_{\tau}}R(\tau)\frac{\nabla P_{\theta}(\tau)}{P_{\theta}(\tau)}P_{\theta}(\tau)=\sum_{n_{\tau}}P_{\theta}(\tau)R(\tau)\frac{\nabla P_{\theta}(\tau)}{P_{\theta}(\tau)}=\sum_{n_{\tau}}P_{\theta}(\tau)R(\tau)\nabla \ln P_{\theta}(\tau)$
 
 $\because P_{\theta}(\tau)=\rho (s_1)\pi_{\theta}(a_1|s_1)p(s_2|s_1,a_1)\pi_{\theta}(a_2|s_2)p(s_3|s_2,a_2)···\pi_{\theta}(a_{l_{\tau}-1}|s_{l_{\tau}-1})p(s_{l_{\tau}}|s_{l_{\tau}-1},a_{l_{\tau}-1})$
 
-$\therefore \ln P_{\theta}(\tau)=\ln \rho (s_1)+\sum_{i=1}^{l_{tau}-1}\ln \pi_{\theta}(a_i|s_i)+\sum_{i=1}^{l_{\tau}-1}\ln p(s_{i+1}|s_i,a_i)$
+$\therefore \ln P_{\theta}(\tau)=\ln \rho (s_1)+\sum_{i=1}^{l_{\tau}-1}\ln \pi_{\theta}(a_i|s_i)+\sum_{i=1}^{l_{\tau}-1}\ln p(s_{i+1}|s_i,a_i)$
 
-$\therefore \nabla \ln P_{\theta}(\tau)=\sum_{i=1}^{l_{tau}-1}\nabla \ln \pi_{\theta}(a_i|s_i)$
+$\therefore \nabla \ln P_{\theta}(\tau)=\sum_{i=1}^{l_{\tau}-1}\nabla \ln \pi_{\theta}(a_i|s_i)$
 
 $\therefore \nabla R_{\theta}=\sum_{n_{\tau}}\sum_{i=1}^{l_{\tau}-1}P_{\theta}(\tau)R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)]$
 
+$\therefore \theta \gets \theta+\alpha * E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)]$
 # 项目日志
 
 ## 20250709
