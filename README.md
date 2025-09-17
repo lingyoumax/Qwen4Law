@@ -222,19 +222,30 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
     - 将相似向量的搜索范围缩小到该簇内的向量，而不是整个数据集。
 - ```Policy Gradient```：
 
-$\because R_{\theta}=E_{\tau \sim P_{\theta}}[R(\tau)]=\sum_{n_{\tau}}R(\tau)P_{\theta}(\tau)$
+$\because R_{\theta}=E_{\tau \sim P_{\theta}}[R(\tau)]=\sum_{\tau}R(\tau)P_{\theta}(\tau)$
 
-$\therefore \nabla R_{\theta}=\sum_{n_{\tau}}R(\tau)\nabla P_{\theta}(\tau)=\sum_{n_{\tau}}R(\tau)\frac{\nabla P_{\theta}(\tau)}{P_{\theta}(\tau)}P_{\theta}(\tau)=\sum_{n_{\tau}}P_{\theta}(\tau)R(\tau)\frac{\nabla P_{\theta}(\tau)}{P_{\theta}(\tau)}=\sum_{n_{\tau}}P_{\theta}(\tau)R(\tau)\nabla \ln P_{\theta}(\tau)$
+$\therefore \nabla R_{\theta}=\sum_{\tau}R(\tau)\nabla P_{\theta}(\tau)=\sum_{\tau}R(\tau)\frac{\nabla P_{\theta}(\tau)}{P_{\theta}(\tau)}P_{\theta}(\tau)=\sum_{\tau}P_{\theta}(\tau)R(\tau)\frac{\nabla P_{\theta}(\tau)}{P_{\theta}(\tau)}=\sum_{\tau}P_{\theta}(\tau)R(\tau)\nabla \ln P_{\theta}(\tau)$
 
-$\because P_{\theta}(\tau)=\rho (s_1)\pi_{\theta}(a_1|s_1)p(s_2|s_1,a_1)\pi_{\theta}(a_2|s_2)p(s_3|s_2,a_2)···\pi_{\theta}(a_{l_{\tau}-1}|s_{l_{\tau}-1})p(s_{l_{\tau}}|s_{l_{\tau}-1},a_{l_{\tau}-1})$
+$\because P_{\theta}(\tau)=\rho (s_1^{\tau})\pi_{\theta}(a_1^{\tau}|s_1^{\tau})p(s_2^{\tau}|s_1^{\tau},a_1^{\tau})\pi_{\theta}(a_2^{\tau}|s_2^{\tau})p(s_3^{\tau}|s_2^{\tau},a_2^{\tau})···\pi_{\theta}(a_{l_{\tau}-1}^{\tau}|s_{l_{\tau}-1}^{\tau})p(s_{l_{\tau}}^{\tau}|s_{l_{\tau}-1}^{\tau},a_{l_{\tau}-1}^{\tau})$
 
-$\therefore \ln P_{\theta}(\tau)=\ln \rho (s_1)+\sum_{i=1}^{l_{\tau}-1}\ln \pi_{\theta}(a_i|s_i)+\sum_{i=1}^{l_{\tau}-1}\ln p(s_{i+1}|s_i,a_i)$
+$\therefore \ln P_{\theta}(\tau)=\ln \rho (s_1^{\tau})+\sum_{i=1}^{l_{\tau}-1}\ln \pi_{\theta}(a_i^{\tau}|s_i^{\tau})+\sum_{i=1}^{l_{\tau}-1}\ln p(s_{i+1}^{\tau}|s_i^{\tau},a_i^{\tau})$
 
-$\therefore \nabla \ln P_{\theta}(\tau)=\sum_{i=1}^{l_{\tau}-1}\nabla \ln \pi_{\theta}(a_i|s_i)$
+$\therefore \nabla \ln P_{\theta}(\tau)=\sum_{i=1}^{l_{\tau}-1}\nabla \ln \pi_{\theta}(a_i^{\tau}|s_i^{\tau})$
 
-$\therefore \nabla R_{\theta}=\sum_{n_{\tau}}\sum_{i=1}^{l_{\tau}-1}P_{\theta}(\tau)R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)]$
+$\therefore \nabla R_{\theta}=\sum_{\tau}\sum_{i=1}^{l_{\tau}-1}P_{\theta}(\tau)R(\tau)\nabla \ln \pi_{\theta}(a_i^{\tau}|s_i^{\tau})=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)]$
 
-$\therefore \theta \gets \theta+\alpha * E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)]$
+$\because E[A+B]=E[A]+E[B]$
+
+$\therefore E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}V(s_i)\nabla \ln \pi_{\theta}(a_i|s_i)]=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}E_{s_i,a_i}[V(s_i)\nabla \ln \pi_{\theta}(a_i|s_i)]]=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}E_{s_i}[E_{a_i \sim \pi_{\theta}(·|s_i)}[V(s_i) \nabla \ln \pi_{\theta}(a_i|s_i)]]]=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}E_{s_i}[V(s_i) E_{a_i \sim \pi_{\theta}(·|s_i)}[\nabla \ln \pi_{\theta}(a_i|s_i)]]]$
+
+$\because E_{a_i \sim \pi_{\theta}(·|s_i)}[\nabla \ln \pi_{\theta}(a_i|s_i)]=\sum_{a_i}\pi_{\theta}(a_i|s_i) \nabla \ln \pi_{\theta}(a_i|s_i)=\sum_{a_i}\pi_{\theta}(a_i|s_i) \frac{\nabla \pi_{\theta}(a_i|s_i)}{\pi_{\theta}(a_i|s_i)}=\sum_{a_i} \nabla \pi_{\theta}(a_i|s_i)=\nabla \sum_{a_i}\pi_{\theta}(a_i|s_i)=\nabla 1=0$
+
+$\therefore E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}E_{s_i}[V(s_i) E_{a_i \sim \pi_{\theta}(·|s_i)}[\nabla \ln \pi_{\theta}(a_i|s_i)]]]=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}E_{s_i}[V(s_i) \times 0]]=0$
+
+$\therefore E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}V(s_i)\nabla \ln \pi_{\theta}(a_i|s_i)]=0$
+
+$\therefore \nabla R_{\theta}=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}R(\tau)\nabla \ln \pi_{\theta}(a_i|s_i)]-E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}V(s_i)\nabla \ln \pi_{\theta}(a_i|s_i)]=E_{\tau \sim P_{\theta}}[\sum_{i=1}^{l_{\tau}-1}(R(\tau)-V(s_i^{\tau}))\nabla \ln \pi_{\theta}(a_i|s_i)]$
+
 # 项目日志
 
 ## 20250709
