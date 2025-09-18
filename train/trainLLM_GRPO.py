@@ -5,7 +5,7 @@ import pandas as pd
 from peft import PeftModel
 from torch.utils.data import DataLoader
 from transformers import BatchEncoding
-import copy
+from torch.nn.utils.rnn import pad_sequence
 import os
 from tqdm.auto import tqdm
 
@@ -14,7 +14,7 @@ from scripts.tools import getReward
 
 lr = 1e-5
 K=4
-temperature=0.5
+temperature=0.7
 n_epoch = 2
 savePath = "weight/LLM_GRPO"
 os.makedirs(savePath, exist_ok=True)
@@ -42,7 +42,6 @@ token_true_id = rewardmodel_tokenizer.convert_tokens_to_ids("yes")
 
 llm = AutoModelForCausalLM.from_pretrained(
     llm_modelname,
-    device_map=device,
     torch_dtype=torch.bfloat16,
     trust_remote_code=True
 )
@@ -61,7 +60,12 @@ llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname, trust_remote_code=T
 llm_tokenizer.padding_side = "left"
 
 '''
-reference_llm=copy.deepcopy(llm)
+reference_llm = AutoModelForCausalLM.from_pretrained(
+    llm_modelname,
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=True,
+)
+reference_llm = PeftModel.from_pretrained(reference_llm, "weight/LLM_SFT").to(device)
 reference_llm.eval()
 '''
 
@@ -99,25 +103,63 @@ test_dataloader = DataLoader(
     collate_fn=collate_fn
 )
 
-optimizer = torch.optim.AdamW(llm.parameters(), lr=lr)
+optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, llm.parameters()), lr=lr)
 
-for epoch in tqdm(range(n_epoch), desc="Training"):
-    trainloss=0
-    for batch in tqdm(train_dataloader):
-        answers=[[] for _ in range(llm_batch_size)]
-        for _ in range(K):
-            with torch.no_grad(): 
-                input_dict = BatchEncoding({"input_ids":batch["input_ids"],"attention_mask":batch["attention_mask"]})
-                generated_ids = llm.generate(**input_dict, max_new_tokens=1024, do_sample=True, temperature=temperature)
-                for i in range(llm_batch_size):
-                    answer_ids = generated_ids[i][len(batch["input_ids"][i]):].tolist() 
-                    answer = llm_tokenizer.decode(answer_ids, skip_special_tokens=True).strip("\n")
-                    answers[i].append(answer)
-        for i in range(llm_batch_size):            
-            query=batch["query"][i]
-            r=getReward(rewardmodel,rewardmodel_tokenizer,query,answers[i],token_false_id,token_true_id)
-            print(r)
-            a=(r-torch.mean(r))/torch.std(r)
-            print(a)
+def sample_answers(model, input_ids, attention_mask, K, temperature, max_new_tokens):
+    """
+    返回：
+      answers_text: List[List[str]]   [B][K]
+      answers_ids:  List[List[List[int]]]  [B][K][len_ans]
+    """
+    B = input_ids.size(0)
+    answers_text = [[] for _ in range(B)]
+    answers_ids  = [[] for _ in range(B)]
+    for _ in range(K):
+        inps = BatchEncoding({"input_ids": input_ids, "attention_mask": attention_mask})
+        gen_ids = model.generate(
+            **inps,
+            do_sample=True,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+            pad_token_id=llm_tokenizer.pad_token_id,
+            eos_token_id=llm_tokenizer.eos_token_id,
+        )
+        for i in range(B):
+            ans_ids = gen_ids[i][input_ids[i].shape[0]:].tolist()
+            text = llm_tokenizer.decode(ans_ids, skip_special_tokens=True).strip()
+            answers_text[i].append(text)
+            answers_ids[i].append(ans_ids)
+    return answers_text, answers_ids
+
+def build_concat_batch(prompts_ids, prompts_mask, answers_ids_list, tokenizer, max_len=None):
+    B = prompts_ids.size(0)
+    seqs, attns, prompt_lens, ans_lens = [], [], [], []
+    pad_id = tokenizer.pad_token_id
+
+    for i in range(B):
+        m = prompts_mask[i].sum().item()
+        prompt = prompts_ids[i][-m:].tolist()
+
+        for ans in answers_ids_list[i]:
+            ans = list(ans)
+            if len(ans) == 0 or ans[-1] != tokenizer.eos_token_id:
+                ans = ans + [tokenizer.eos_token_id]
+
+            seq = prompt + ans
+            if max_len is not None and len(seq) > max_len:
+                seq = seq[-max_len:]
+                pr_len = min(m, len(seq) - len(ans))
+            else:
+                pr_len = len(prompt)
+
+            att = [1] * len(seq)
+            seqs.append(torch.tensor(seq, dtype=torch.long))
+            attns.append(torch.tensor(att, dtype=torch.long))
+            prompt_lens.append(pr_len)
+            ans_lens.append(len(seq) - pr_len)
+
+    concat_input_ids = pad_sequence(seqs, batch_first=True, padding_value=pad_id).to(device)
+    concat_attention = pad_sequence(attns, batch_first=True, padding_value=0).to(device)
+    return concat_input_ids, concat_attention, prompt_lens, ans_lens
 
 llm.save_pretrained(savePath)
