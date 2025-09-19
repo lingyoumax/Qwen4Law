@@ -238,9 +238,9 @@ for epoch in tqdm(range(n_epoch)):
         concat_attention = concat_attention.to(device, non_blocking=True)
 
         # 5) 计算 logprob（当前策略 & 参考策略；对回答部分取平均）
-        logp_pi  = sequence_logprobs(llm, concat_input_ids, concat_attention, prompt_lens)
+        logp_pi, _  = sequence_logprobs(llm, concat_input_ids, concat_attention, prompt_lens)
         with torch.no_grad():
-            logp_ref = sequence_logprobs(reference_llm, concat_input_ids, concat_attention, prompt_lens)
+            logp_ref, _ = sequence_logprobs(reference_llm, concat_input_ids, concat_attention, prompt_lens)
 
 
         # 6) GRPO 损失： -A * logp_pi  +  kl_coef * (logp_pi - logp_ref)
