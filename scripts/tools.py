@@ -241,6 +241,84 @@ def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id)
 
     return hpc, md, disp
 
+@torch.inference_mode()
+def evaluateTrainedLLM(llm, llm_tokenizer, rewardmodel, rewardmodel_tokenizer, dataloader, token_false_id, token_true_id, max_new_tokens):
+
+    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\"."
+    def build_prompt(query:str, answer: str) -> str:
+        return (
+            f"<|im_start|>system\n{system}<|im_end|>\n"
+            f"<|im_start|>user\n<Query>: {query}\n<Answer>: {answer}<|im_end|>\n"
+            f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        )
+    
+    llm.eval()
+    rewardmodel.eval()
+
+    total_reward = 0.0
+    count = 0
+
+    for batch in tqdm(dataloader):
+        B = batch["input_ids"].size(0)
+
+        inps = BatchEncoding({
+            "input_ids": batch["input_ids"],
+            "attention_mask": batch["attention_mask"]
+        })
+        gen_ids = llm.generate(
+            **inps,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=llm_tokenizer.pad_token_id,
+            eos_token_id=llm_tokenizer.eos_token_id,
+        )
+
+        answers=[]
+        for i in range(B):
+            output_ids = gen_ids[i][len(inps.input_ids[i]):].tolist() 
+
+            try:
+                index = len(output_ids) - output_ids[::-1].index(151668)
+            except ValueError:
+                index = 0
+
+            answer = llm_tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+            answers.append(answer)
+
+        prompts = [build_prompt(q,a) for q,a in zip(batch["query"], answers)]
+        enc = rewardmodel_tokenizer(
+            prompts, padding=True, truncation=True, max_length=rewardmodel_max_length, return_tensors="pt"
+        ).to(rewardmodel.device)
+        scores = rewardmodel(**enc).logits[:, -1, :]
+        true_vector = scores[:, token_true_id]
+        false_vector = scores[:, token_false_id]
+        r = torch.sigmoid(true_vector-false_vector)
+        total_reward+= float(r.sum())
+        count+=B
+    llm.train()
+    return total_reward / count if count > 0 else 0.0
+
+@torch.no_grad()
+def getReward(model, tokenizer, query, answers, token_false_id, token_true_id):
+    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\"."
+
+    def build_prompt(answer: str) -> str:
+        return (
+            f"<|im_start|>system\n{system}<|im_end|>\n"
+            f"<|im_start|>user\n<Query>: {query}\n<Answer>: {answer}<|im_end|>\n"
+            f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        )
+
+    prompts = [build_prompt(a) for a in answers]
+    enc = tokenizer(
+        prompts, padding=True, truncation=True, max_length=rewardmodel_max_length, return_tensors="pt"
+    ).to(model.device)
+    scores = model(**enc).logits[:, -1, :]
+    true_vector = scores[:, token_true_id]
+    false_vector = scores[:, token_false_id]
+    r = torch.sigmoid(true_vector-false_vector)
+    return r
+
 def drawLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))
 
@@ -256,23 +334,17 @@ def drawLoss(saveName, TrainLoss, TestLoss):
 
     plt.savefig(f"figs/{saveName}.svg")
 
-@torch.no_grad()
-def getReward(model, tokenizer, query, answers, token_false_id, token_true_id):
-    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\"."
+def drawReward(saveName, TrainR, TestR):
+    plt.figure(figsize=(20, 10))
 
-    def build_prompt(answer: str) -> str:
-        return (
-            f"<|im_start|>system\n{system}<|im_end|>\n"
-            f"<|im_start|>user\n<Query>: {query}n<Answer>: {answer}"
-            f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
-        )
+    plt.subplot(1, 2, 1)
+    plt.plot(TrainR, color='limegreen')
+    plt.xlabel('Epoch')
+    plt.ylabel("Reward of Training Set")
 
-    prompts = [build_prompt(a) for a in answers]
-    enc = tokenizer(
-        prompts, padding=True, truncation=True, max_length=rewardmodel_max_length, return_tensors="pt"
-    ).to(model.device)
-    scores = model(**enc).logits[:, -1, :]
-    true_vector = scores[:, token_true_id]
-    false_vector = scores[:, token_false_id]
-    r = torch.sigmoid(true_vector-false_vector)
-    return r
+    plt.subplot(1, 2, 2)
+    plt.plot(TestR, color='darkviolet')
+    plt.xlabel('Epoch')
+    plt.ylabel("Reward of Test Set")
+
+    plt.savefig(f"figs/{saveName}.svg")
