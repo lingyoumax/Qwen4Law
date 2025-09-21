@@ -11,7 +11,17 @@ from torch.nn import functional as F
 from modelscope import AutoModelForCausalLM, AutoTokenizer 
 
 from scripts.settings import random_seed, llm_test_ratio, device, llm_modelname, rewardmodel_modelname, llm_max_length, rlhf_llm_batch_size
-from scripts.tools import getReward, evaluateTrainedLLM, drawReward
+from scripts.tools import getReward_batched, evaluateTrainedLLM, drawReward
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"   # 或 "true"
+
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cuda.enable_flash_sdp(True)   # PyTorch 2.1+
+torch.backends.cuda.enable_mem_efficient_sdp(True)
+torch.backends.cuda.enable_math_sdp(True)
+
+torch.set_float32_matmul_precision("high")   # TF32 on Ampere
 
 lr = 1e-5
 K = 4
@@ -19,7 +29,6 @@ temperature = 0.7
 n_epoch = 5
 max_new_tokens = 512
 kl_coef = 0.02
-grad_clip = 1.0
 savePath = "weight/LLM_GRPO"
 os.makedirs(savePath, exist_ok=True)
 
@@ -40,11 +49,11 @@ train_dataset = dataset_split["train"]
 test_dataset = dataset_split["test"]
 
 rewardmodel_adapter_path = "weight/RewardModel_QLoRA"
-rewardmodel = AutoModelForCausalLM.from_pretrained(rewardmodel_modelname, trust_remote_code=True)
+rewardmodel = AutoModelForCausalLM.from_pretrained(rewardmodel_modelname, device_map="cuda:1")
 rewardmodel = PeftModel.from_pretrained(rewardmodel, rewardmodel_adapter_path)
-rewardmodel.eval().to(device)
+rewardmodel.eval()
 
-rewardmodel_tokenizer = AutoTokenizer.from_pretrained(rewardmodel_modelname, padding_side="left", trust_remote_code=True)
+rewardmodel_tokenizer = AutoTokenizer.from_pretrained(rewardmodel_modelname, padding_side="left")
 if rewardmodel_tokenizer.pad_token is None:
     rewardmodel_tokenizer.pad_token = rewardmodel_tokenizer.eos_token
 
@@ -55,14 +64,14 @@ token_true_id  = rewardmodel_tokenizer.convert_tokens_to_ids("yes")
 llm = AutoModelForCausalLM.from_pretrained(
     llm_modelname,
     torch_dtype=torch.bfloat16,
-    trust_remote_code=True,
+    device_map=device
 )
-llm = PeftModel.from_pretrained(llm, "weight/LLM_SFT").to(device)
+llm = PeftModel.from_pretrained(llm, "weight/LLM_SFT")
 
 for n, p in llm.named_parameters():
     p.requires_grad = ("lora" in n)
 
-llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname, trust_remote_code=True)
+llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname)
 llm_tokenizer.padding_side = "left"
 if llm_tokenizer.pad_token is None:
     llm_tokenizer.pad_token = llm_tokenizer.eos_token
@@ -70,9 +79,9 @@ if llm_tokenizer.pad_token is None:
 reference_llm = AutoModelForCausalLM.from_pretrained(
     llm_modelname,
     torch_dtype=torch.bfloat16,
-    trust_remote_code=True,
+    device_map=device
 )
-reference_llm = PeftModel.from_pretrained(reference_llm, "weight/LLM_SFT").to(device)
+reference_llm = PeftModel.from_pretrained(reference_llm, "weight/LLM_SFT")
 reference_llm.eval()
 for param in reference_llm.parameters():
     param.requires_grad = False
@@ -97,8 +106,8 @@ tokenized_test_dataset  = test_dataset.map(tokenize_function,  remove_columns=te
 
 def collate_fn(batch):
     out = {}
-    out["input_ids"] = torch.stack([torch.tensor(x["input_ids"]) for x in batch]).to(device)
-    out["attention_mask"] = torch.stack([torch.tensor(x["attention_mask"]) for x in batch]).to(device)
+    out["input_ids"] = torch.stack([torch.tensor(x["input_ids"]) for x in batch]).to(device, non_blocking=True)
+    out["attention_mask"] = torch.stack([torch.tensor(x["attention_mask"]) for x in batch]).to(device, non_blocking=True)
     out["input"] = [x["input"] for x in batch]
     out["query"] = [x["query"] for x in batch]
     return out
@@ -106,32 +115,40 @@ def collate_fn(batch):
 train_dataloader = DataLoader(tokenized_train_dataset, batch_size=rlhf_llm_batch_size, shuffle=True,  collate_fn=collate_fn)
 test_dataloader  = DataLoader(tokenized_test_dataset,  batch_size=rlhf_llm_batch_size, shuffle=False, collate_fn=collate_fn)
 
-
-optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, llm.parameters()), lr=lr)
+optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, llm.parameters()), lr=lr, fused=True)
 
 @torch.no_grad()
 def sample_answers(model, input_ids, attention_mask, K, temperature, max_new_tokens):
     model.eval()
     B = input_ids.size(0)
-    answers_text = [[] for _ in range(B)]
+
+    # Repeat inputs K times
+    inps = BatchEncoding({
+        "input_ids": input_ids.repeat_interleave(K, dim=0),
+        "attention_mask": attention_mask.repeat_interleave(K, dim=0),
+    })
+    gen_ids = model.generate(
+        **inps,
+        do_sample=True,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+        pad_token_id=llm_tokenizer.pad_token_id,
+        eos_token_id=llm_tokenizer.eos_token_id,
+        num_return_sequences=1,   # already repeated inputs
+        use_cache=True,
+    )
+    # Slice off prompts and regroup to B lists of length K
     answers_ids  = [[] for _ in range(B)]
-    for _ in range(K):
-        inps = BatchEncoding({"input_ids": input_ids, "attention_mask": attention_mask})
-        gen_ids = model.generate(
-            **inps,
-            do_sample=True,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-            pad_token_id=llm_tokenizer.pad_token_id,
-            eos_token_id=llm_tokenizer.eos_token_id,
-        )
-        for i in range(B):
-            ans_ids = gen_ids[i][input_ids[i].shape[0]:].tolist()
-            text = llm_tokenizer.decode(ans_ids, skip_special_tokens=True).strip()
-            answers_text[i].append(text)
-            answers_ids[i].append(ans_ids)
-        del gen_ids
+    for i in range(B*K):
+        b = i // K
+        start = input_ids[b].shape[0]
+        ans_ids = gen_ids[i][start:].tolist()
+        answers_ids[b].append(ans_ids)
+        # decode later in batch (avoid per-sample decode)
     model.train()
+    flat_ans_ids = [ids for group in answers_ids for ids in group]
+    flat_texts = llm_tokenizer.batch_decode([torch.tensor(x, dtype=torch.long, device=device) for x in flat_ans_ids],   skip_special_tokens=True)
+    answers_text = [flat_texts[i*K:(i+1)*K] for i in range(B)]
     return answers_text, answers_ids
 
 def build_concat_batch(prompts_ids, prompts_mask, answers_ids_list, tokenizer, max_len=None):
@@ -166,27 +183,21 @@ def build_concat_batch(prompts_ids, prompts_mask, answers_ids_list, tokenizer, m
 
 def sequence_logprobs(model, input_ids, attention_mask, prompt_lens):
     logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
-    log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)  
-    labels = input_ids[:, 1:]                                
+    log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)
+    labels = input_ids[:, 1:]
+    # mask: [N, L-1] where True for answer tokens
+    Lm1 = labels.size(1)
+    idx = torch.arange(Lm1, device=labels.device).unsqueeze(0)
+    pl = torch.as_tensor(prompt_lens, device=labels.device).unsqueeze(1)
+    mask = idx >= pl
 
-    N, Lm1 = labels.shape
-    out_logp = []
-    out_len = []
-    for i in range(N):
-        pr_len = prompt_lens[i]
-        mask = torch.zeros(Lm1, dtype=torch.bool, device=labels.device)
-        
-        mask[pr_len:] = True
+    token_logp = log_probs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
+    token_logp = token_logp.masked_fill(~mask, 0.0)
 
-        token_logp = log_probs[i].gather(-1, labels[i].unsqueeze(-1)).squeeze(-1)
-        token_logp = token_logp[mask]
-        length = token_logp.numel()
-        out_len.append(length)
-        if length == 0:
-            out_logp.append(torch.tensor(0.0, device=labels.device))
-        else:
-            out_logp.append(token_logp.mean())#对比求和还是mean更好
-    return torch.stack(out_logp, dim=0), torch.tensor(out_len, device=labels.device)
+    lengths = mask.sum(dim=1).clamp_min(1)
+    out_logp = (token_logp.sum(dim=1) / lengths)
+    del logits, log_probs, labels, idx, pl, mask, token_logp
+    return out_logp, lengths
 
 llm.train()
 
@@ -195,72 +206,68 @@ TestR=[]
 
 TrainR.append(evaluateTrainedLLM(llm,llm_tokenizer,rewardmodel,rewardmodel_tokenizer,train_dataloader,token_false_id,token_true_id,max_new_tokens))
 TestR.append(evaluateTrainedLLM(llm,llm_tokenizer,rewardmodel,rewardmodel_tokenizer,test_dataloader,token_false_id,token_true_id,max_new_tokens))
-drawReward("LLM_GRPO", TrainR, TestR)
 best_testr=TestR[0]
+
+accumulation_steps = 4  
 global_step = 0
+
 for epoch in tqdm(range(n_epoch)):
     epoch_loss = 0.0
+    accum_step = 0  
 
     for batch in tqdm(train_dataloader):
         B = batch["input_ids"].size(0)
-
+        input_ids=batch["input_ids"]
+        attention_mask=batch["attention_mask"]
         with torch.no_grad():
             answers_text, answers_token_ids = sample_answers(
-                llm, batch["input_ids"], batch["attention_mask"],
+                llm, input_ids, attention_mask,
                 K=K, temperature=temperature, max_new_tokens=max_new_tokens
             )
 
-        # 2) 奖励（每个样本内的 K 个回答）
-        #    r_list: List[Tensor[K]]，每个元素对应一个样本组
-        r_list = []
-        for i in range(B):
-            r = getReward(
-                rewardmodel, rewardmodel_tokenizer,
-                batch["query"][i], answers_text[i],
-                token_false_id, token_true_id
-            )  # 假设返回 shape=(K,) 的 Tensor（在 CPU 或 GPU）
-            r = r.to(device).float()
-            r_list.append(r)
-
-        # 3) 组内标准化优势（A = (r - mean)/std）
-        R = torch.stack(r_list, dim=0).to(torch.float32)
+        R = getReward_batched(
+        rewardmodel, rewardmodel_tokenizer,
+        batch["query"],
+        answers_text, 
+        token_false_id,
+        token_true_id,
+        ).to(torch.float32)
+        R=R.to(device, non_blocking=True)
         var, mean = torch.var_mean(R, dim=1, unbiased=False, keepdim=True)
         std = (var + 1e-8).sqrt()
-        A_flat = ((R - mean) / std).reshape(-1).to(r_list[0].dtype)
-        del r_list
+        A_flat = ((R - mean) / std).reshape(-1).to(R.dtype)
 
-        # 4) 构建拼接 batch（N = B*K），用于计算当前策略/参考策略的 logprob
         concat_input_ids, concat_attention, prompt_lens, ans_lens = build_concat_batch(
-            batch["input_ids"], batch["attention_mask"], answers_token_ids,
+            input_ids, attention_mask, answers_token_ids,
             tokenizer=llm_tokenizer, max_len=llm_max_length + max_new_tokens
         )
-        concat_input_ids = concat_input_ids.to(device, non_blocking=True)
-        concat_attention = concat_attention.to(device, non_blocking=True)
+        del answers_token_ids, ans_lens
 
-        # 5) 计算 logprob（当前策略 & 参考策略；对回答部分取平均）
         logp_pi, _  = sequence_logprobs(llm, concat_input_ids, concat_attention, prompt_lens)
         with torch.no_grad():
             logp_ref, _ = sequence_logprobs(reference_llm, concat_input_ids, concat_attention, prompt_lens)
-
-
-        # 6) GRPO 损失： -A * logp_pi  +  kl_coef * (logp_pi - logp_ref)
-        #    其中 KL 项使用 token-level 平均 log 比率的近似
-        loss_main = -(A_flat.detach() * logp_pi).mean()
-        loss_kl   = kl_coef * (logp_pi - logp_ref).mean()
+            logp_ref = logp_ref.to(device, non_blocking=True)
+        loss_main = -(A_flat.detach() * logp_pi).mean() / accumulation_steps
+        loss_kl   = kl_coef * (logp_pi - logp_ref).mean() / accumulation_steps
         loss = loss_main + loss_kl
 
-        optimizer.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(llm.parameters(), grad_clip)
-        optimizer.step()
+        epoch_loss += loss.item() * accumulation_steps
 
-        epoch_loss += loss.item()
-        
-        global_step += 1
+        accum_step += 1
+        if accum_step % accumulation_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+            global_step += 1
 
         del concat_input_ids, concat_attention, prompt_lens
         del logp_pi, logp_ref, A_flat
         del loss_main, loss_kl, loss
+
+    if accum_step % accumulation_steps != 0:
+        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
+        global_step += 1
 
     print(f"[Epoch {epoch+1}] avg loss = {epoch_loss/len(train_dataloader):.4f}")
 
@@ -271,6 +278,5 @@ for epoch in tqdm(range(n_epoch)):
         llm.save_pretrained(savePath)
     TrainR.append(trainr)
     TestR.append(testr)
-    drawReward("LLM_GRPO", TrainR, TestR)
 
 drawReward("LLM_GRPO", TrainR, TestR)

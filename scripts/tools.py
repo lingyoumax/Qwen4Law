@@ -1,6 +1,6 @@
 from transformers import BatchEncoding
 import torch
-import torch
+from torch.amp import autocast
 import torch.nn.functional as F
 import os
 import matplotlib.pyplot as plt
@@ -242,61 +242,149 @@ def evaluateTrainedRewardModel(model, dataloader, token_false_id, token_true_id)
     return hpc, md, disp
 
 @torch.inference_mode()
-def evaluateTrainedLLM(llm, llm_tokenizer, rewardmodel, rewardmodel_tokenizer, dataloader, token_false_id, token_true_id, max_new_tokens):
+def evaluateLLM_DPO(model, dataloader, beta):
 
-    system = "Evaluate the given answer based on the question, and comprehensively assess whether it is a good answer from the perspectives of accuracy, completeness, rigor, usefulness, and natural fluency. Note that the answer can only be \"yes\" or \"no\"."
-    def build_prompt(query:str, answer: str) -> str:
+    def _get_response_logp(model, input_ids, attention_mask, prompt_lens):
+        logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
+    
+        log_probs = F.log_softmax(logits, dim=-1)
+    
+        labels = input_ids[:, 1:]
+        log_probs = log_probs[:, :-1, :]
+    
+        B, L, V = log_probs.shape
+        token_log_probs = log_probs.gather(
+            dim=-1,
+            index=labels.unsqueeze(-1)
+        ).squeeze(-1)
+    
+        B, L_minus_1 = token_log_probs.shape
+        arange = torch.arange(L_minus_1, device=input_ids.device) 
+        mask = (arange.unsqueeze(0) >= prompt_lens.unsqueeze(1)).float() 
+    
+        mask = mask * attention_mask[:, 1:].float() 
+    
+        sum_logp = (token_log_probs * mask).sum(dim=1)
+        count_tokens = mask.sum(dim=1)
+    
+        count_tokens = torch.clamp(count_tokens, min=1.0)
+        avg_logp = sum_logp / count_tokens
+    
+        return avg_logp
+
+    model.eval()
+    l = 0
+    total = 0
+    for batch in tqdm(dataloader):
+        logp_chosen = _get_response_logp(
+            model,
+            input_ids=batch["chosen_ids"],
+            attention_mask=batch["chosen_attention_mask"],
+            prompt_lens=batch["prompt_lens"]
+        )
+
+        logp_rejected = _get_response_logp(
+            model,
+            input_ids=batch["rejected_ids"],
+            attention_mask=batch["rejected_attention_mask"],
+            prompt_lens=batch["prompt_lens"]
+        )
+        loss = -F.logsigmoid(beta * (logp_chosen - logp_rejected)).sum()
+        B=batch["chosen_ids"].shape[0]
+        l+=loss.item()
+        total+=B
+            
+    model.train()
+    return l/total if total > 0 else 0
+
+@torch.inference_mode()
+def evaluateTrainedLLM(llm,llm_tokenizer,rewardmodel,rewardmodel_tokenizer,dataloader,token_false_id,token_true_id,max_new_tokens):
+    """
+    Faster evaluation:
+    1) batched generation & decode
+    2) batched reward scoring
+    3) correct last-token gather
+    """
+
+    system = (
+        'Evaluate the given answer based on the question, and comprehensively assess '
+        'whether it is a good answer from the perspectives of accuracy, completeness, '
+        'rigor, usefulness, and natural fluency. Note that the answer can only be "yes" or "no".'
+    )
+
+    def build_prompt(query, answer):
         return (
             f"<|im_start|>system\n{system}<|im_end|>\n"
             f"<|im_start|>user\n<Query>: {query}\n<Answer>: {answer}<|im_end|>\n"
             f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
         )
-    
+
     llm.eval()
     rewardmodel.eval()
 
     total_reward = 0.0
-    count = 0
+    total_count = 0
 
+    # 尽量在 GPU 上生成 + 自动混精
     for batch in tqdm(dataloader):
-        B = batch["input_ids"].size(0)
+        input_ids = batch["input_ids"].to(llm.device, non_blocking=True)
+        attention_mask = batch["attention_mask"].to(llm.device, non_blocking=True)
 
-        inps = BatchEncoding({
-            "input_ids": batch["input_ids"],
-            "attention_mask": batch["attention_mask"]
-        })
-        gen_ids = llm.generate(
-            **inps,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            pad_token_id=llm_tokenizer.pad_token_id,
-            eos_token_id=llm_tokenizer.eos_token_id,
+        # ===== 1) 一次性生成 =====
+        with autocast(device_type="cuda", dtype=torch.bfloat16, enabled=True):
+            gen_ids = llm.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=llm_tokenizer.pad_token_id,
+                eos_token_id=llm_tokenizer.eos_token_id,
+            )
+
+        # ===== 2) 批量 decode =====
+        # 去掉 prompt 部分
+        cut_ids = [
+            g[len(inp):] for g, inp in zip(gen_ids, input_ids)
+        ]
+        answers = llm_tokenizer.batch_decode(cut_ids, skip_special_tokens=True)
+        # 去除多余空格/换行
+        answers = [a.strip() for a in answers]
+
+        # ===== 3) 构造 reward prompts =====
+        prompts = [build_prompt(q, a) for q, a in zip(batch["query"], answers)]
+
+        # ===== 4) 奖励模型一次性推理 =====
+        enc = rewardmodel_tokenizer(
+            prompts,
+            padding=True,
+            truncation=True,
+            max_length=rewardmodel_max_length,
+            pad_to_multiple_of=8,
+            return_tensors="pt",
+        )
+        input_ids_r = enc["input_ids"].to(rewardmodel.device, non_blocking=True)
+        attention_mask_r = enc["attention_mask"].to(rewardmodel.device, non_blocking=True)
+
+        with autocast(device_type="cuda", dtype=torch.bfloat16, enabled=True):
+            logits = rewardmodel(
+                input_ids=input_ids_r,
+                attention_mask=attention_mask_r
+            ).logits                                   # [N, L, V]
+
+        # 取每条样本最后一个有效 token 的 logits
+        last_idx = attention_mask_r.sum(dim=1) - 1
+        batch_idx = torch.arange(logits.size(0), device=logits.device)
+        last_logits = logits[batch_idx, last_idx, :]   # [N, V]
+
+        r = torch.sigmoid(
+            last_logits[:, token_true_id] - last_logits[:, token_false_id]
         )
 
-        answers=[]
-        for i in range(B):
-            output_ids = gen_ids[i][len(inps.input_ids[i]):].tolist() 
+        total_reward += r.sum().item()
+        total_count  += r.size(0)
 
-            try:
-                index = len(output_ids) - output_ids[::-1].index(151668)
-            except ValueError:
-                index = 0
-
-            answer = llm_tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
-            answers.append(answer)
-
-        prompts = [build_prompt(q,a) for q,a in zip(batch["query"], answers)]
-        enc = rewardmodel_tokenizer(
-            prompts, padding=True, truncation=True, max_length=rewardmodel_max_length, return_tensors="pt"
-        ).to(rewardmodel.device)
-        scores = rewardmodel(**enc).logits[:, -1, :]
-        true_vector = scores[:, token_true_id]
-        false_vector = scores[:, token_false_id]
-        r = torch.sigmoid(true_vector-false_vector)
-        total_reward+= float(r.sum())
-        count+=B
     llm.train()
-    return total_reward / count if count > 0 else 0.0
+    return total_reward / max(total_count, 1)
 
 @torch.no_grad()
 def getReward(model, tokenizer, query, answers, token_false_id, token_true_id):
@@ -318,6 +406,52 @@ def getReward(model, tokenizer, query, answers, token_false_id, token_true_id):
     false_vector = scores[:, token_false_id]
     r = torch.sigmoid(true_vector-false_vector)
     return r
+
+@torch.no_grad()
+def getReward_batched(model, tokenizer,
+                      queries: list[str],
+                      answers: list[list[str]],
+                      token_false_id: int,
+                      token_true_id: int) -> torch.Tensor:
+    """
+    queries : list of length B
+    answers : list of length B, each a list of K answers
+    returns : tensor [B, K] of rewards in [0,1]
+    """
+    system = (
+        "Evaluate the given answer based on the question, and comprehensively "
+        "assess whether it is a good answer from the perspectives of accuracy, "
+        "completeness, rigor, usefulness, and natural fluency. "
+        'Note that the answer can only be "yes" or "no".'
+    )
+
+    # Build all prompts in a single flat list
+    flat_prompts = []
+    for q, ans_list in zip(queries, answers):
+        for a in ans_list:
+            prompt = (
+                f"<|im_start|>system\n{system}<|im_end|>\n"
+                f"<|im_start|>user\n<Query>: {q}\n<Answer>: {a}<|im_end|>\n"
+                f"<|im_start|>assistant\n<think>\n\n</think>\n\n"
+            )
+            flat_prompts.append(prompt)
+
+    # Tokenize all at once
+    enc = tokenizer(
+        flat_prompts,
+        padding=True,
+        truncation=True,
+        max_length=rewardmodel_max_length,
+        return_tensors="pt"
+    ).to(model.device)
+
+    # Single forward pass
+    logits = model(**enc).logits[:, -1, :]
+    r = torch.sigmoid(logits[:, token_true_id] - logits[:, token_false_id])
+
+    # Reshape back to [B, K]
+    B, K = len(queries), len(answers[0])
+    return r.view(B, K)
 
 def drawLoss(saveName, TrainLoss, TestLoss):
     plt.figure(figsize=(20, 10))

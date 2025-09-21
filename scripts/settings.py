@@ -15,6 +15,7 @@ reranker_batch_size = 4
 reranker_test_ratio = 0.2
 llm_max_length = 1024
 llm_batch_size=4
+rlhf_llm_batch_size=1
 llm_test_ratio = 0.2
 rewardmodel_max_length = 1024
 rewardmodel_batch_size=4
