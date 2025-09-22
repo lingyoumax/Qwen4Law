@@ -27,7 +27,6 @@ os.makedirs(savePath, exist_ok=True)
 df = pd.read_csv("data/LLMDataset_RLHF.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
-    """构建prompt+chosen/rejected的完整文本（匹配模型对话格式）"""
     prompt = (
         f"<|im_start|>user\nBased on the content:{row['doc']}\n"
         f"Answer the Question:{row['query']}\n<|im_end|>\n"
@@ -203,9 +202,6 @@ for epoch in tqdm(range(n_epoch)):
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
             global_step += 1
-
-        del batch, loss
-        torch.cuda.empty_cache()
 
     if accum_step % accumulation_steps != 0:
         torch.nn.utils.clip_grad_norm_(llm.parameters(), grad_clip)
