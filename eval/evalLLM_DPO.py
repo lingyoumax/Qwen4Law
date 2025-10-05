@@ -24,9 +24,9 @@ dataset_split = dataset.train_test_split(test_size=llm_test_ratio, seed=random_s
 test_dataset  = dataset_split["test"]
 
 rewardmodel_adapter_path = "weight/RewardModel_QLoRA"
-rewardmodel = AutoModelForCausalLM.from_pretrained(rewardmodel_modelname).to(device)
+rewardmodel = AutoModelForCausalLM.from_pretrained(rewardmodel_modelname)
 rewardmodel = PeftModel.from_pretrained(rewardmodel, rewardmodel_adapter_path)
-rewardmodel.eval()
+rewardmodel.eval().to(device)
 rewardmodel_tokenizer = AutoTokenizer.from_pretrained(rewardmodel_modelname, padding_side='left')
 
 token_false_id = rewardmodel_tokenizer.convert_tokens_to_ids("no")
@@ -35,16 +35,14 @@ token_true_id = rewardmodel_tokenizer.convert_tokens_to_ids("yes")
 llm = AutoModelForCausalLM.from_pretrained(
     llm_modelname,
     device_map=device,
-    torch_dtype=torch.bfloat16,
-    trust_remote_code=True
+    torch_dtype=torch.bfloat16
 )
-llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname, trust_remote_code=True)
+llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname)
 
 llm = PeftModel.from_pretrained(
     llm, 
     "weight/LLM_DPO"
-).to(device)
-llm.eval()
+).eval().to(device)
 
 Reward=[]
 for sample in tqdm(test_dataset):
@@ -87,5 +85,5 @@ plt.legend()
 plt.tight_layout()
 
 os.makedirs("figs", exist_ok=True)
-plt.savefig('figs/evalLLM_GRPO.svg')
+plt.savefig('figs/evalLLM_DPO.svg')
 print(mean_Reward)

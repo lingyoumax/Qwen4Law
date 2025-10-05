@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 lr = 1e-5
 n_epoch = 5
 max_new_tokens = 512
-beta = 1
+beta = 0.1
 grad_clip = 1.0
 savePath = "weight/LLM_DPO"
 os.makedirs(savePath, exist_ok=True)
@@ -29,17 +29,15 @@ df = pd.read_csv("data/LLMDataset_RLHF.csv", encoding="utf-8-sig")
 def row_to_sample(row):
     prompt = (
         f"<|im_start|>user\nBased on the content:{row['doc']}\n"
-        f"Answer the Question:{row['query']}\n<|im_end|>\n"
+        f"Answer the Question:{row['query']}\n/no_think<|im_end|>\n"
         f"<|im_start|>assistant\n"
     )
-    chosen_text = prompt + row["answer_good"].strip() + f"\n<|im_end|>"
-    rejected_text = prompt + row["answer_bad"].strip() + f"\n<|im_end|>"
-    query=f"Based on the content:{row['doc']}\nAnswer the Question:{row['query']}"
+    chosen_text = prompt + row["answer_good"] + f"\n<|im_end|>"
+    rejected_text = prompt + row["answer_bad"] + f"\n<|im_end|>"
     return {
         "prompt": prompt,
         "chosen_text": chosen_text,
-        "rejected_text": rejected_text,
-        "query":query
+        "rejected_text": rejected_text
     }
 
 dataset = Dataset.from_list([row_to_sample(row) for _, row in df.iterrows()])
@@ -56,51 +54,50 @@ llm = PeftModel.from_pretrained(llm, "weight/LLM_SFT").to(device)
 for n, p in llm.named_parameters():
     p.requires_grad = ("lora" in n)
 
-llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname, trust_remote_code=True)
+llm_tokenizer = AutoTokenizer.from_pretrained(llm_modelname)
 llm_tokenizer.padding_side = "left"
 if llm_tokenizer.pad_token is None:
     llm_tokenizer.pad_token = llm_tokenizer.eos_token
 
 def tokenize_function(example):
-    
     prompt = example["prompt"]
     
-    prompt_tokenized = llm_tokenizer(
-        prompt,
-        padding="max_length",
-        truncation=True,
-        max_length=llm_max_length,
-        return_tensors="pt"
+    prompt_ids_trunc = llm_tokenizer(
+        prompt, truncation=True, max_length=llm_max_length, add_special_tokens=True
+    )["input_ids"]
+    prompt_len_trunc = len(prompt_ids_trunc)
+
+    # 2) 编码 chosen/rejected（保持你原来的设定）
+    chosen_tok = llm_tokenizer(
+        example["chosen_text"], padding="max_length", truncation=True,
+        max_length=llm_max_length, return_tensors="pt"
+    )
+    rejected_tok = llm_tokenizer(
+        example["rejected_text"], padding="max_length", truncation=True,
+        max_length=llm_max_length, return_tensors="pt"
     )
 
-    chosen_tokenized = llm_tokenizer(
-        example["chosen_text"],
-        padding="max_length",
-        truncation=True,
-        max_length=llm_max_length,
-        return_tensors="pt"
-    )
-    rejected_tokenized = llm_tokenizer(
-        example["rejected_text"],
-        padding="max_length",
-        truncation=True,
-        max_length=llm_max_length,
-        return_tensors="pt"
-    )
-    
-    prompt_raw_ids = llm_tokenizer(prompt, truncation=False)["input_ids"]
-    prompt_len = len(prompt_raw_ids)
-    
+    # 3) 各自的左侧 pad 数（left padding -> attention_mask 前面是 0）
+    chosen_am = chosen_tok["attention_mask"][0]
+    rejected_am = rejected_tok["attention_mask"][0]
+    pad_left_chosen = int((chosen_am == 0).sum().item())
+    pad_left_rejected = int((rejected_am == 0).sum().item())
+
+    # 4) 各自答案起点（在 input_ids 里的下标）
+    L_chosen = int(chosen_tok["input_ids"].shape[1])
+    L_rejected = int(rejected_tok["input_ids"].shape[1])
+    ans_start_chosen = min(pad_left_chosen + prompt_len_trunc, L_chosen)  # 允许等于 L -> 空掩码
+    ans_start_rejected = min(pad_left_rejected + prompt_len_trunc, L_rejected)
+
     return {
-        "input":example["prompt"],
-        "input_ids": prompt_tokenized["input_ids"][0],
-        "attention_mask": prompt_tokenized["attention_mask"][0],
-        "query": example["query"],
-        "chosen_ids": chosen_tokenized["input_ids"][0],
-        "chosen_attention_mask": chosen_tokenized["attention_mask"][0],
-        "rejected_ids": rejected_tokenized["input_ids"][0],
-        "rejected_attention_mask": rejected_tokenized["attention_mask"][0],
-        "prompt_len": prompt_len
+
+        "chosen_ids": chosen_tok["input_ids"][0],
+        "chosen_attention_mask": chosen_am,
+        "rejected_ids": rejected_tok["input_ids"][0],
+        "rejected_attention_mask": rejected_am,
+
+        "ans_start_chosen": ans_start_chosen,
+        "ans_start_rejected": ans_start_rejected,
     }
 
 tokenized_train_dataset = train_dataset.map(
@@ -114,15 +111,12 @@ tokenized_test_dataset = test_dataset.map(
 
 def collate_fn(batch):
     out = {}
-    out["input_ids"] = torch.stack([torch.tensor(x["input_ids"]) for x in batch]).to(device, non_blocking=True)
-    out["attention_mask"] = torch.stack([torch.tensor(x["attention_mask"]) for x in batch]).to(device, non_blocking=True)
-    out["input"] = [x["input"] for x in batch]
-    out["query"] = [x["query"] for x in batch]
     out["chosen_ids"] = torch.stack([torch.tensor(x["chosen_ids"]) for x in batch]).to(device, non_blocking=True)
     out["chosen_attention_mask"] = torch.stack([torch.tensor(x["chosen_attention_mask"]) for x in batch]).to(device, non_blocking=True)
     out["rejected_ids"] = torch.stack([torch.tensor(x["rejected_ids"]) for x in batch]).to(device, non_blocking=True)
     out["rejected_attention_mask"] = torch.stack([torch.tensor(x["rejected_attention_mask"]) for x in batch]).to(device, non_blocking=True)
-    out["prompt_lens"] = torch.stack([torch.tensor(x["prompt_len"]) for x in batch]).to(device, non_blocking=True)
+    out["ans_start_chosen"] = torch.tensor([x["ans_start_chosen"] for x in batch]).to(device, non_blocking=True)
+    out["ans_start_rejected"] = torch.tensor([x["ans_start_rejected"] for x in batch]).to(device, non_blocking=True)
     return out
 
 train_dataloader = DataLoader(tokenized_train_dataset, batch_size=rlhf_llm_batch_size, shuffle=True, collate_fn=collate_fn)
@@ -130,57 +124,41 @@ test_dataloader = DataLoader(tokenized_test_dataset, batch_size=rlhf_llm_batch_s
 
 def dpo_loss(model, batch, beta):
     logp_chosen = _get_response_logp(
-        model,
-        input_ids=batch["chosen_ids"],
-        attention_mask=batch["chosen_attention_mask"],
-        prompt_lens=batch["prompt_lens"]
+        model, batch["chosen_ids"], batch["chosen_attention_mask"],
+        batch["ans_start_chosen"]
     )
-
     logp_rejected = _get_response_logp(
-        model,
-        input_ids=batch["rejected_ids"],
-        attention_mask=batch["rejected_attention_mask"],
-        prompt_lens=batch["prompt_lens"]
+        model, batch["rejected_ids"], batch["rejected_attention_mask"],
+        batch["ans_start_rejected"]
     )
-    
-    loss = -F.logsigmoid(beta * (logp_chosen - logp_rejected)).mean()
-    return loss
+    return -F.logsigmoid(beta * (logp_chosen - logp_rejected)).mean()
 
-def _get_response_logp(model, input_ids, attention_mask, prompt_lens):
+def _get_response_logp(model, input_ids, attention_mask, answer_starts):
     logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
-    
     log_probs = F.log_softmax(logits, dim=-1)
-    
+
     labels = input_ids[:, 1:]
-    log_probs = log_probs[:, :-1, :]
-    
-    B, L, V = log_probs.shape
-    token_log_probs = log_probs.gather(
-        dim=-1,
-        index=labels.unsqueeze(-1) 
-    ).squeeze(-1)
-    
-    B, L_minus_1 = token_log_probs.shape
-    arange = torch.arange(L_minus_1, device=input_ids.device)
-    mask = (arange.unsqueeze(0) >= prompt_lens.unsqueeze(1)).float()
-    
-    mask = mask * attention_mask[:, 1:].float()
-    
+    log_probs = log_probs[:, :-1, :]  # 对齐
+
+    token_log_probs = log_probs.gather(dim=-1, index=labels.unsqueeze(-1)).squeeze(-1)
+
+    B, Lm1 = token_log_probs.shape
+    arange = torch.arange(Lm1, device=input_ids.device).unsqueeze(0)  # [1, L-1]
+
+    thresholds = (answer_starts - 1).unsqueeze(1).clamp_min(0)       # [B,1]
+    mask_prompt = (arange >= thresholds).float()                     # [B, L-1]
+    mask = mask_prompt * attention_mask[:, 1:].float()
+
     sum_logp = (token_log_probs * mask).sum(dim=1)
-    count_tokens = mask.sum(dim=1)
-    
-    count_tokens = torch.clamp(count_tokens, min=1.0)
-    avg_logp = sum_logp / count_tokens
-    
-    return avg_logp
+    return sum_logp
 
 optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, llm.parameters()), lr=lr)
 
 llm.train()
 TrainLoss = []
 TestLoss = []
-TrainLoss.append(evaluateLLM_DPO(llm, train_dataloader, beta))
-TestLoss.append(evaluateLLM_DPO(llm, test_dataloader, beta))
+TrainLoss.append(evaluateLLM_DPO(llm, train_dataloader, beta,_get_response_logp))
+TestLoss.append(evaluateLLM_DPO(llm, test_dataloader, beta,_get_response_logp))
 best_testloss = TestLoss[0]
 
 accumulation_steps = 4
@@ -211,8 +189,8 @@ for epoch in tqdm(range(n_epoch)):
 
     print(f"[Epoch {epoch+1}] avg loss = {epoch_loss/len(train_dataloader):.4f}")
 
-    trainloss = evaluateLLM_DPO(llm, train_dataloader, beta)
-    testloss = evaluateLLM_DPO(llm, test_dataloader, beta)
+    trainloss = evaluateLLM_DPO(llm, train_dataloader, beta, _get_response_logp)
+    testloss = evaluateLLM_DPO(llm, test_dataloader, beta, _get_response_logp)
     
     if testloss < best_testloss:
         best_testloss = testloss

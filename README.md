@@ -112,7 +112,6 @@
 同时，分别实现了以下强化学习方法：
 
 - DPO
-- GRPO
 
 # 结果及分析
 
@@ -142,7 +141,7 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 |---|---|---|---|
 |Base|0.757|0.594|0.664|
 |RAG|0.896| 0.833 | 0.861 |
-|RAG + SFT| 0.932 | 0.945 | 0.937 |
+|RAG + SFT| 0.930 | 0.938 | 0.933 |
 
 基础模型输出与数据集answer的BERTScore分布：
 ![evalLLM_based_0](figs/evalLLM_based_0.svg)
@@ -169,14 +168,19 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 ![RewardModel_QLoRA](figs/RewardModel_QLoRA.svg)
 
 ## LLM-RLHF
-|Model|Average Reward |
+| Model | Average Reward |
 |---|---|
-|SFT|0.0039758751112275665|
-|DPO|-|
-|GRPO|-|
+|SFT|0.003974027687581497|
+|DPO|0.9369966952390351|
 
 微调前的奖励值分布：
 ![evalLLM_based_1](figs/evalLLM_based_1.svg)
+
+DPO微调后的奖励值分布：
+![evalLLM_DPO](figs/evalLLM_DPO.svg)
+
+DPO微调训练过程中的Loss曲线：
+![LLM_DPO](figs/LLM_DPO.svg)
 
 # 过程中的思考：
 - 为什么使用RAG？
