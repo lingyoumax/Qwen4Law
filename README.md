@@ -1,6 +1,6 @@
 # 项目目的
 
-本项目计划基于Qwen3搭建一个法律知识信息问答系统。
+本项目计划基于Qwen3搭建一个法律知识信息问答系统。训练后的模型权重[下载链接](https://drive.google.com/file/d/1fwOQ6Jh6KDeDvMydRiFF6JXd_vifmBcn/view?usp=drive_link)。
 
 # 技术路线
 
@@ -170,7 +170,7 @@ $$\text{平均得分}=\frac{p(yes|(q,d^+))+\sum_{i=1}^Np(no|(q,d_i^-))}{1+N}$$
 ## LLM-RLHF
 | Model | Average Reward |
 |---|---|
-|SFT|0.003974027687581497|
+|RAG + SFT|0.003974027687581497|
 |DPO|0.9369966952390351|
 
 微调前的奖励值分布：
