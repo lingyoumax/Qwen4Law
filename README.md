@@ -1,6 +1,6 @@
 # 项目目的
 
-本项目计划基于Qwen3搭建一个法律知识信息问答系统。训练后的模型权重[下载链接](https://drive.google.com/file/d/1fwOQ6Jh6KDeDvMydRiFF6JXd_vifmBcn/view?usp=drive_link)。
+本项目计划基于Qwen3搭建一个法律知识信息问答系统。训练后的模型权重[下载链接](https://drive.google.com/file/d/1PgG4zLvNfqRP3Gx8eI--ga7ZN-pOJod8/view)。
 
 # 技术路线
 
