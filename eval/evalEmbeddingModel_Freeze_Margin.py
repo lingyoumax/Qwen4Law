@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from scripts.settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
-from scripts.tools import evaluateTrainedEmbeddingModel
+from scripts.tools import evaluateTrainedEmbeddingModel_Margin
 
 df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
@@ -27,7 +27,8 @@ model = AutoModel.from_pretrained(
     embedding_modelname,
     device_map= device
 )
-
+state_dict = torch.load("weight/EmbeddingModel_Freeze/EmbeddingModel_Freeze_Best.pth", map_location=device)
+model.load_state_dict(state_dict)
 model.eval()
 tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
 
@@ -67,5 +68,5 @@ test_dataloader = DataLoader(
     collate_fn=collate_fn
 )
 
-margin = evaluateTrainedEmbeddingModel(model, test_dataloader)
+margin = evaluateTrainedEmbeddingModel_Margin(model, test_dataloader)
 print(margin)

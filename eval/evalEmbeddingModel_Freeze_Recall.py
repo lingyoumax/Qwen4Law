@@ -1,21 +1,18 @@
 from datasets import Dataset
 import pandas as pd
-from peft import PeftModel
 from modelscope import AutoModel, AutoTokenizer
 import torch
 from torch.utils.data import DataLoader
 
-from scripts.settings import num_negative_docs, device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
-from scripts.tools import evaluateTrainedEmbeddingModel
+from scripts.settings import device, embedding_max_length, random_seed, embedding_modelname, embedding_test_ratio, embedding_batch_size
+from scripts.tools import evaluateTrainedEmbeddingModel_Recall
 
-adapter_path = "weight/EmbeddingModel_QLoRA"
 df = pd.read_csv("data/RetrieverDataset_cleaned.csv", encoding="utf-8-sig")
 
 def row_to_sample(row):
     sample = {
         "query": row["query"],
         "positive": row["positive_doc"],
-        "negatives": [row[f"negative_doc{i}"] for i in range(num_negative_docs)]
     }
     return sample
 
@@ -29,7 +26,8 @@ model = AutoModel.from_pretrained(
     embedding_modelname,
     device_map= device
 )
-model = PeftModel.from_pretrained(model, adapter_path)
+state_dict = torch.load("weight/EmbeddingModel_Freeze/EmbeddingModel_Freeze_Best.pth", map_location=device)
+model.load_state_dict(state_dict)
 
 model.eval()
 tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='left')
@@ -37,7 +35,6 @@ tokenizer = AutoTokenizer.from_pretrained(embedding_modelname, padding_side='lef
 def tokenize_function(example):
     query = tokenizer(example["query"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
     positive = tokenizer(example["positive"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
-    negatives = tokenizer(example["negatives"], padding="max_length", truncation=True, max_length=embedding_max_length, return_tensors="pt")
 
     features = {
         "query_input_ids": query["input_ids"][0],
@@ -45,10 +42,6 @@ def tokenize_function(example):
         "positive_input_ids": positive["input_ids"][0],
         "positive_attention_mask": positive["attention_mask"][0]
     }
-
-    for i in range(num_negative_docs):
-        features[f"negative_input_ids_{i}"] = negatives["input_ids"][i]
-        features[f"negative_attention_mask_{i}"] = negatives["attention_mask"][i]
 
     return features
 
@@ -70,5 +63,5 @@ test_dataloader = DataLoader(
     collate_fn=collate_fn
 )
 
-margin = evaluateTrainedEmbeddingModel(model, test_dataloader)
-print(margin)
+recall = evaluateTrainedEmbeddingModel_Recall(model, test_dataloader)
+print(recall)

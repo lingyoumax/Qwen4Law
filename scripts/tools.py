@@ -76,7 +76,7 @@ def evaluateEmbeddingModel(model, dataloader, temperature):
     model.train()
     return l/total if total > 0 else 0
 
-def evaluateTrainedEmbeddingModel(model, dataloader):
+def evaluateTrainedEmbeddingModel_Margin(model, dataloader):
     # 计算模型在测试集上的分离度
     model.eval()
     margin = 0
@@ -115,6 +115,45 @@ def evaluateTrainedEmbeddingModel(model, dataloader):
             
     model.train()
     return margin/total if total > 0 else 0
+
+def evaluateTrainedEmbeddingModel_Recall(model, dataloader):
+    # 计算模型在测试集上的Recall@1
+    model.eval()
+    recall = 0
+    total = 0
+    all_query_embeddings = []
+    all_positive_embeddings = []
+    with torch.inference_mode():
+        for batch in tqdm(dataloader):
+            query_dict=BatchEncoding({"input_ids":batch["query_input_ids"],"attention_mask":batch["query_attention_mask"]})
+            query_output = model(**query_dict)
+            query_embedding = last_token_pool(query_output.last_hidden_state, batch["query_attention_mask"])#batch_size * embedding_length
+            query_embedding = F.normalize(query_embedding, dim=1)
+
+            positive_dict=BatchEncoding({"input_ids":batch["positive_input_ids"],"attention_mask":batch["positive_attention_mask"]})
+            positive_output = model(**positive_dict)
+            positive_embedding = last_token_pool(positive_output.last_hidden_state, batch["positive_attention_mask"])#batch_size * embedding_length
+            positive_embedding = F.normalize(positive_embedding, dim=1)
+
+            all_query_embeddings.append(query_embedding)
+            all_positive_embeddings.append(positive_embedding)
+            
+            B = query_embedding.size(0)
+
+            total = total + B
+
+        all_query_embeddings = torch.cat(all_query_embeddings, dim=0)
+        all_positive_embeddings = torch.cat(all_positive_embeddings, dim=0)
+        for i in tqdm(range(total)):
+            qe=all_query_embeddings[i:i+1] 
+            sim_matrix = torch.matmul(qe, all_positive_embeddings.T)
+            pred_idx = torch.argmax(sim_matrix, dim=1).item()
+            if i == pred_idx:
+                recall+=1
+
+            
+    model.train()
+    return recall/total if total > 0 else 0
 
 def computeRerankerScore(model, inputs, token_true_id, token_false_id, ind = 0):
     batch_scores = model(**inputs).logits[:, -1, :]
