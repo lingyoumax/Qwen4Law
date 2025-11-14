@@ -1,9 +1,9 @@
 import pdfplumber
 import re
 import pandas as pd
-from tools import getFiles
 from tqdm import tqdm
 
+from .tools import getFiles
 def is_chinese_char_or_punct(ch):
     return (
         '\u4e00' <= ch <= '\u9fff' or
