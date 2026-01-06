@@ -351,3 +351,4 @@ $\therefore \theta \gets \theta + \alpha * E_{\tau \sim P_{\theta}}[\sum_{i=1}^{
     year={2025}
 }
 ```
+![Star History](https://www.star-history.com/#lingyoumax/Qwen4Law&type=date&legend=top-left)
