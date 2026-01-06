@@ -77,7 +77,7 @@
 如下图所示，同样分析了输入对应的token长度，在考虑了覆盖性和GPU负载能力后，选择将max_token_length定为1024。
 ![evalRewardModelTokenLength](figs/evalRewardModelTokenLength.jpg)
 ### Model
-输入问答对之后，通过提示词方式让LLM判断这个回答是否是一个好回答，是的话就输出"yes"，不是的话就输出"no"，通过比较LLM对这两个Token的预测值，来评价该模型的得分$r$
+输入问答对之后，通过提示词方式让LLM判断这个回答是否是一个好回答，是的话就输出"yes"，不是的话就输出"no"，通过比较LLM对这两个Token的预测值，来评价该模型的得分 $r$
 
 使用Qwen3-0.6B架构，采取以下技术路线进行实验：
 
