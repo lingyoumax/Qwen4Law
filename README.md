@@ -1,3 +1,11 @@
+<a href="https://www.star-history.com/?repos=lingyoumax%2FQwen4Law&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=lingyoumax/Qwen4Law&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=lingyoumax/Qwen4Law&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=lingyoumax/Qwen4Law&type=date&legend=top-left" />
+ </picture>
+</a>
+
 # 项目目的
 
 本项目计划基于Qwen3搭建一个法律知识信息问答系统。训练后的模型权重[下载链接](https://drive.google.com/file/d/1PgG4zLvNfqRP3Gx8eI--ga7ZN-pOJod8/view)。
@@ -351,4 +359,3 @@ $\therefore \theta \gets \theta + \alpha * E_{\tau \sim P_{\theta}}[\sum_{i=1}^{
     year={2025}
 }
 ```
-![Star History](https://www.star-history.com/?repos=lingyoumax%2FQwen4Law&type=date&legend=top-left)
